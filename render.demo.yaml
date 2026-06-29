@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: genesys-ops-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn ops_app_demo:app --bind 0.0.0.0:$PORT --timeout 600
+    envVars:
+      - key: OPS_DEMO_MODE
+        value: "1"
+      - key: PYTHON_VERSION
+        value: "3.13.0"
+      - key: GENESYS_CLIENT_ID
+        sync: false
+      - key: GENESYS_CLIENT_SECRET
+        sync: false
+      - key: GENESYS_REGION
+        value: usw2

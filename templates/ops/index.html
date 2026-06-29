@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en" data-demo-mode="{{ '1' if demo_mode else '0' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if demo_mode %}Genesys Cloud Ops — Demo{% else %}Genesys Cloud Ops{% endif %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/ops.css') }}">
+</head>
+<body class="{% if demo_mode %}demo-mode{% endif %}">
+  {% if demo_mode %}
+  <div class="demo-banner">
+    <strong>Demo mode</strong> — dry run only. No changes can be applied to Genesys Cloud from this instance.
+  </div>
+  {% endif %}
+
+  <header class="topbar">
+    <div>
+      <h1>Genesys Cloud Ops{% if demo_mode %} <span class="demo-tag">Demo</span>{% endif %}</h1>
+      <p class="subtitle">
+        {% if demo_mode %}
+          Preview tools safely. Select a tool below to see what it does and run a dry run.
+        {% else %}
+          Dry run by default. Execute only after review.
+        {% endif %}
+      </p>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" id="btn-health" class="btn secondary">Check Auth</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <label for="tool-select">Tool</label>
+      <select id="tool-select">
+        <option value="">— Select a tool —</option>
+        {% for category, items in categories.items() %}
+        <optgroup label="{{ category }}">
+          {% for tool in items %}
+          <option value="{{ tool.id }}" data-mutating="{{ '1' if tool.mutating else '0' }}">{{ tool.name }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+      <p id="tool-description" class="tool-description"></p>
+      <div id="tool-help" class="tool-help hidden"></div>
+      <p id="tool-warning" class="tool-warning hidden"></p>
+    </aside>
+
+    <section class="workspace">
+      <form id="tool-form" class="tool-form hidden">
+        <div id="fields-container"></div>
+
+        <div class="mode-panel" id="mode-panel">
+          <div class="mode-dry">
+            <span class="badge dry">DRY RUN</span>
+            <span>{% if demo_mode %}Preview only — execute is disabled in demo mode.{% else %}Preview changes without applying them.{% endif %}</span>
+          </div>
+
+          {% if not demo_mode %}
+          <div class="execute-section hidden" id="execute-section">
+            <input type="hidden" name="execute_mode" id="execute-mode-hidden" value="0">
+            <label class="execute-toggle">
+              <input type="checkbox" id="execute-mode">
+              Enable execute mode
+            </label>
+            <div class="execute-warning hidden" id="execute-warning">
+              <strong>Warning:</strong> Execute mode will make live changes in Genesys Cloud.
+              Type <code>EXECUTE</code> below to confirm.
+            </div>
+            <label class="confirm-field hidden" id="confirm-field">
+              Confirmation
+              <input type="text" name="execute_confirm" id="execute-confirm" placeholder="Type EXECUTE" autocomplete="off">
+            </label>
+          </div>
+          {% else %}
+          <input type="hidden" name="execute_mode" value="0">
+          {% endif %}
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn primary" id="btn-run-dry">{% if demo_mode %}Run Preview{% else %}Run Dry Run{% endif %}</button>
+          {% if not demo_mode %}
+          <button type="submit" class="btn danger hidden" id="btn-run-execute" data-execute="1">Execute Changes</button>
+          {% endif %}
+        </div>
+      </form>
+
+      <div id="placeholder" class="placeholder">
+        <p>Select a tool from the dropdown to configure and run it.</p>
+        {% if demo_mode %}
+        <p class="placeholder-hint">Each tool includes a short explanation of what it does and when to use it.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="log-panel">
+      <div class="log-header">
+        <h2>Output</h2>
+        <div class="log-actions">
+          <label class="clear-option" title="Start each run with a fresh log">
+            <input type="checkbox" id="clear-before-run" checked>
+            Clear before run
+          </label>
+          <button type="button" class="btn secondary" id="btn-copy-log">Copy</button>
+          <button type="button" class="btn secondary" id="btn-clear-log">Clear Log</button>
+        </div>
+      </div>
+      <pre id="log" aria-live="polite"></pre>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='ops/ops.js') }}"></script>
+</body>
+</html>

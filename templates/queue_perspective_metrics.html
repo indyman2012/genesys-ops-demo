@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Queue Perspective Metrics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/queue_perspective_metrics.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/queue_perspective_metrics.css') }}">
+</head>
+<body>
+<div class="layout">
+
+    <aside class="sidebar">
+        <h1>Queue Perspective</h1>
+        <div class="subtle">Filters and operating targets</div>
+
+        <section class="sidebar-panel">
+            <h2>Filters</h2>
+            {% set description = section_desc.filters %}
+            {% include "components/section_help.html" %}
+
+            <form method="get" class="filter-grid">
+                <div>
+                    <label>Start Date</label>
+                    <input type="date" name="start_date" value="{{ data.filters.start_date }}">
+                </div>
+
+                <div>
+                    <label>End Date</label>
+                    <input type="date" name="end_date" value="{{ data.filters.end_date }}">
+                </div>
+
+                <div>
+                    <label>Division</label>
+                    <select name="division">
+                        <option value="">All Divisions</option>
+                        {% for div in data.divisions %}
+                            <option value="{{ div }}" {% if data.filters.division == div %}selected{% endif %}>{{ div }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label>Queue Prefix</label>
+                    <input type="text" name="queue_prefix" value="{{ data.filters.queue_prefix }}" placeholder="Patient Services">
+                </div>
+
+                <div class="filter-section-title">Baselines</div>
+
+                <div>
+                    <label>Inbound Mix %</label>
+                    <input type="number" step="0.1" name="baseline_inbound_pct" value="{{ data.filters.baseline_inbound_pct }}">
+                </div>
+
+                <div>
+                    <label>Target ASA</label>
+                    <input type="number" step="1" name="target_asa" value="{{ data.filters.target_asa }}">
+                </div>
+
+                <div>
+                    <label>Target AHT</label>
+                    <input type="number" step="1" name="target_aht" value="{{ data.filters.target_aht }}">
+                </div>
+
+                <div>
+                    <label>Target ACW</label>
+                    <input type="number" step="1" name="target_acw" value="{{ data.filters.target_acw }}">
+                </div>
+
+                <div>
+                    <label>Target Abandon %</label>
+                    <input type="number" step="0.1" name="target_abandon_pct" value="{{ data.filters.target_abandon_pct }}">
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn" type="submit">Apply</button>
+                    <a class="btn" href="{{ url_for('page') }}">Reset</a>
+                </div>
+            </form>
+        </section>
+    </aside>
+
+    <main class="main">
+        <div class="header">
+            <div>
+                <h1>Queue Perspective Metrics</h1>
+                <div>
+                    {{ data.filters.start_date }} through {{ data.filters.end_date }}
+                    {% if data.filters.division %} · Division: {{ data.filters.division }}{% endif %}
+                    {% if data.filters.queue_prefix %} · Queue Prefix: {{ data.filters.queue_prefix }}{% endif %}
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn" onclick="window.print()">Print / Save PDF</button>
+                <a class="btn"
+                   href="{{ url_for('export',
+                        start_date=data.filters.start_date,
+                        end_date=data.filters.end_date,
+                        division=data.filters.division,
+                        queue_prefix=data.filters.queue_prefix,
+                        baseline_inbound_pct=data.filters.baseline_inbound_pct,
+                        target_asa=data.filters.target_asa,
+                        target_aht=data.filters.target_aht,
+                        target_acw=data.filters.target_acw,
+                        target_abandon_pct=data.filters.target_abandon_pct) }}">Export CSV</a>
+            </div>
+        </div>
+
+        <section class="panel">
+            <h2>Summary</h2>
+            {% set description = section_desc.summary %}
+            {% include "components/section_help.html" %}
+
+            <div class="cards">
+                <div class="card"><div class="label">Inbound</div><div class="value">{{ data.cards.inbound }}</div></div>
+                <div class="card"><div class="label">Outbound</div><div class="value">{{ data.cards.outbound }}</div></div>
+                <div class="card"><div class="label">Total</div><div class="value">{{ data.cards.total }}</div></div>
+                <div class="card"><div class="label">Abandoned</div><div class="value">{{ data.cards.abandoned }}</div></div>
+                <div class="card"><div class="label">Abandon %</div><div class="value">{{ data.cards.abandon_pct if data.cards.abandon_pct is not none else "N/A" }}%</div></div>
+                <div class="card"><div class="label">Inbound Mix</div><div class="value">{{ data.cards.inbound_pct }}%</div></div>
+                <div class="card"><div class="label">Mix Variance</div><div class="value">{{ data.cards.mix_variance }}%</div></div>
+                <div class="card"><div class="label">ASA</div><div class="value">{{ data.cards.avg_asa if data.cards.avg_asa is not none else "N/A" }}s</div></div>
+                <div class="card"><div class="label">AHT</div><div class="value">{{ data.cards.avg_aht if data.cards.avg_aht is not none else "N/A" }}s</div></div>
+                <div class="card"><div class="label">ACW</div><div class="value">{{ data.cards.avg_acw if data.cards.avg_acw is not none else "N/A" }}s</div></div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Volume Trend</h2>
+            {% set description = section_desc.volume_trend %}
+            {% include "components/section_help.html" %}
+            <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
+        </section>
+
+        <section class="panel">
+            <h2>Metrics Trend</h2>
+            {% set description = section_desc.metrics_trend %}
+            {% include "components/section_help.html" %}
+            <div class="chart-wrap"><canvas id="metricsChart"></canvas></div>
+        </section>
+
+        <section class="panel">
+            <h2>Queue Variance Grid</h2>
+            {% set description = section_desc.variance %}
+            {% include "components/section_help.html" %}
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Queue</th>
+                            <th>Division</th>
+                            <th class="num">Total</th>
+                            <th class="num">Inbound</th>
+                            <th class="num">Outbound</th>
+                            <th class="num">Answered</th>
+                            <th class="num">Abandoned</th>
+                            <th class="num">Abandon %</th>
+                            <th class="num">ASA</th>
+                            <th class="num">AHT</th>
+                            <th class="num">Hold</th>
+                            <th class="num">ACW</th>
+                            <th class="num">ASA Var</th>
+                            <th class="num">AHT Var</th>
+                            <th class="num">ACW Var</th>
+                            <th class="num">Abandon Var</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for q in data.queues %}
+                            <tr>
+                                <td><span class="status-pill {{ q.overall_status }}">{{ q.overall_status|upper }}</span></td>
+                                <td>{{ q.queue_name }}</td>
+                                <td>{{ q.division_name }}</td>
+                                <td class="num">{{ q.total_calls }}</td>
+                                <td class="num">{{ q.inbound_calls }}</td>
+                                <td class="num">{{ q.outbound_calls }}</td>
+                                <td class="num">{{ q.answered_calls }}</td>
+                                <td class="num">{{ q.abandoned_calls }}</td>
+                                <td class="num">{{ q.abandon_pct if q.abandon_pct is not none else "N/A" }}%</td>
+                                <td class="num">{{ q.avg_asa_sec if q.avg_asa_sec is not none else "N/A" }}s</td>
+                                <td class="num">{{ q.avg_talk_sec if q.avg_talk_sec is not none else "N/A" }}s</td>
+                                <td class="num">{{ q.avg_hold_sec if q.avg_hold_sec is not none else "N/A" }}s</td>
+                                <td class="num">{{ q.avg_acw_sec if q.avg_acw_sec is not none else "N/A" }}s</td>
+                                <td class="num"><span class="status-pill {{ 'green' if q.asa_var is not none and q.asa_var|abs < 10 else 'yellow' if q.asa_var is not none and q.asa_var|abs < 20 else 'red' }}">{{ q.asa_var if q.asa_var is not none else "N/A" }}%</span></td>
+                                <td class="num"><span class="status-pill {{ 'green' if q.aht_var is not none and q.aht_var|abs < 10 else 'yellow' if q.aht_var is not none and q.aht_var|abs < 20 else 'red' }}">{{ q.aht_var if q.aht_var is not none else "N/A" }}%</span></td>
+                                <td class="num"><span class="status-pill {{ 'green' if q.acw_var is not none and q.acw_var|abs < 10 else 'yellow' if q.acw_var is not none and q.acw_var|abs < 20 else 'red' }}">{{ q.acw_var if q.acw_var is not none else "N/A" }}%</span></td>
+                                <td class="num"><span class="status-pill {{ 'green' if q.abandon_var is not none and q.abandon_var|abs < 10 else 'yellow' if q.abandon_var is not none and q.abandon_var|abs < 20 else 'red' }}">{{ q.abandon_var if q.abandon_var is not none else "N/A" }}%</span></td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="17">No data found for the selected filters.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Variance Heatmap</h2>
+            {% set description = section_desc.heatmap %}
+            {% include "components/section_help.html" %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Queue</th>
+                            <th class="num">ASA Var</th>
+                            <th class="num">AHT Var</th>
+                            <th class="num">ACW Var</th>
+                            <th class="num">Abandon Var</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for q in data.queues %}
+                            <tr>
+                                <td>{{ q.queue_name }}</td>
+                                <td class="num"><span class="status-pill {{ 'green' if q.asa_var is not none and q.asa_var|abs < 10 else 'yellow' if q.asa_var is not none and q.asa_var|abs < 20 else 'red' }}">{{ q.asa_var if q.asa_var is not none else "N/A" }}%</span></td>
+                                <td class="num"><span class="status-pill {{ 'green' if q.aht_var is not none and q.aht_var|abs < 10 else 'yellow' if q.aht_var is not none and q.aht_var|abs < 20 else 'red' }}">{{ q.aht_var if q.aht_var is not none else "N/A" }}%</span></td>
+                                <td class="num"><span class="status-pill {{ 'green' if q.acw_var is not none and q.acw_var|abs < 10 else 'yellow' if q.acw_var is not none and q.acw_var|abs < 20 else 'red' }}">{{ q.acw_var if q.acw_var is not none else "N/A" }}%</span></td>
+                                <td class="num"><span class="status-pill {{ 'green' if q.abandon_var is not none and q.abandon_var|abs < 10 else 'yellow' if q.abandon_var is not none and q.abandon_var|abs < 20 else 'red' }}">{{ q.abandon_var if q.abandon_var is not none else "N/A" }}%</span></td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5">No heatmap data found for the selected filters.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+const trend = {{ data.trend | tojson }};
+const filters = {{ data.filters | tojson }};
+const labels = trend.map(r => r.metric_date);
+
+makeLineChart("volumeChart", labels, [
+    {label: "Inbound", data: trend.map(r => r.inbound_calls), tension: 0.25},
+    {label: "Outbound", data: trend.map(r => r.outbound_calls), tension: 0.25},
+    {label: "Total", data: trend.map(r => r.total_calls), tension: 0.25}
+], null, null);
+
+makeLineChart("metricsChart", labels, [
+    {label: "ASA", data: trend.map(r => r.avg_asa_sec), tension: 0.25},
+    {label: "AHT", data: trend.map(r => r.avg_talk_sec), tension: 0.25},
+    {label: "ACW", data: trend.map(r => r.avg_acw_sec), tension: 0.25},
+    {label: "Abandon %", data: trend.map(r => r.abandon_pct), tension: 0.25}
+], filters.target_asa, `ASA baseline: ${filters.target_asa}s`);
+</script>
+</body>
+</html>

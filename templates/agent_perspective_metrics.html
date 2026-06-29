@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Agent Perspective Metrics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/agent_perspective_metrics.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/agent_perspective_metrics.css') }}">
+</head>
+<body>
+<div class="layout">
+
+    <aside class="sidebar">
+        <h1>Agent Perspective</h1>
+        <div class="subtle">Search by queue, then compare agents</div>
+
+        <section class="sidebar-panel">
+            <h2>Filters</h2>
+            {% set description = section_desc.filters %}
+            {% include "components/section_help.html" %}
+
+            <form method="get" class="filter-grid">
+                <div>
+                    <label>Start Date</label>
+                    <input type="date" name="start_date" value="{{ data.filters.start_date }}">
+                </div>
+
+                <div>
+                    <label>End Date</label>
+                    <input type="date" name="end_date" value="{{ data.filters.end_date }}">
+                </div>
+
+                <div>
+                    <label>Search Queues</label>
+                    <input type="text" id="queueSearch" onkeyup="filterQueueOptions()" placeholder="Type part of queue name...">
+                </div>
+
+                <div>
+                    <label>Queue</label>
+                    <select class="queue-select" id="queueSelect" name="queue_name" size="10">
+                        {% for queue in data.queue_options %}
+                            <option value="{{ queue }}" {% if data.filters.queue_name == queue %}selected{% endif %}>{{ queue }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn" type="submit">Apply</button>
+                    <a class="btn" href="{{ url_for('page') }}">Reset</a>
+                </div>
+            </form>
+        </section>
+    </aside>
+
+    <main class="main">
+        <div class="header">
+            <div>
+                <h1>Agent Perspective Metrics</h1>
+                <div>
+                    {{ data.filters.start_date }} through {{ data.filters.end_date }}
+                    {% if data.filters.queue_name %} · Queue: {{ data.filters.queue_name }}{% endif %}
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn" onclick="window.print()">Print / Save PDF</button>
+                <a class="btn"
+                   href="{{ url_for('export',
+                        start_date=data.filters.start_date,
+                        end_date=data.filters.end_date,
+                        queue_name=data.filters.queue_name) }}">Export CSV</a>
+            </div>
+        </div>
+
+        <section class="panel">
+            <h2>Summary</h2>
+            {% set description = section_desc.summary %}
+            {% include "components/section_help.html" %}
+
+            <div class="cards">
+                <div class="card"><div class="label">Agents</div><div class="value">{{ data.summary.agent_count }}</div></div>
+                <div class="card"><div class="label">Answered</div><div class="value">{{ data.summary.answered_calls }}</div></div>
+                <div class="card"><div class="label">Outbound</div><div class="value">{{ data.summary.outbound_calls }}</div></div>
+                <div class="card"><div class="label">Handled</div><div class="value">{{ data.summary.handled_calls }}</div></div>
+                <div class="card"><div class="label">ASA</div><div class="value">{{ "%.1f"|format(data.summary.avg_asa_sec) if data.summary.avg_asa_sec is not none else "N/A" }}s</div></div>
+                <div class="card"><div class="label">AHT</div><div class="value">{{ "%.1f"|format(data.summary.avg_talk_sec) if data.summary.avg_talk_sec is not none else "N/A" }}s</div></div>
+                <div class="card"><div class="label">Hold</div><div class="value">{{ "%.1f"|format(data.summary.avg_hold_sec) if data.summary.avg_hold_sec is not none else "N/A" }}s</div></div>
+                <div class="card"><div class="label">ACW</div><div class="value">{{ "%.1f"|format(data.summary.avg_acw_sec) if data.summary.avg_acw_sec is not none else "N/A" }}s</div></div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Daily Trend</h2>
+            {% set description = section_desc.trend %}
+            {% include "components/section_help.html" %}
+            <div class="chart-wrap"><canvas id="agentTrendChart"></canvas></div>
+        </section>
+
+        <section class="panel">
+            <h2>Agents in Selected Queue</h2>
+            {% set description = section_desc.agent_grid %}
+            {% include "components/section_help.html" %}
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th class="num">Answered</th>
+                            <th class="num">Outbound</th>
+                            <th class="num">Handled</th>
+                            <th class="num">ASA</th>
+                            <th class="num">AHT</th>
+                            <th class="num">Hold</th>
+                            <th class="num">ACW</th>
+                            <th class="num">Raw Conversations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in data.agents %}
+                            <tr>
+                                <td>{{ a.agent_name }}</td>
+                                <td class="num">{{ a.answered_calls }}</td>
+                                <td class="num">{{ a.outbound_calls }}</td>
+                                <td class="num">{{ a.handled_calls }}</td>
+                                <td class="num">{{ "%.1f"|format(a.avg_asa_sec) if a.avg_asa_sec is not none else "N/A" }}s</td>
+                                <td class="num">{{ "%.1f"|format(a.avg_talk_sec) if a.avg_talk_sec is not none else "N/A" }}s</td>
+                                <td class="num">{{ "%.1f"|format(a.avg_hold_sec) if a.avg_hold_sec is not none else "N/A" }}s</td>
+                                <td class="num">{{ "%.1f"|format(a.avg_acw_sec) if a.avg_acw_sec is not none else "N/A" }}s</td>
+                                <td class="num">{{ a.raw_conversations }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="9">No agents found for the selected queue/date range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+const trend = {{ data.trend | tojson }};
+const labels = trend.map(r => r.metric_date);
+
+makeLineChart("agentTrendChart", labels, [
+    {label: "Handled", data: trend.map(r => r.handled_calls), tension: 0.25},
+    {label: "Answered", data: trend.map(r => r.answered_calls), tension: 0.25},
+    {label: "Outbound", data: trend.map(r => r.outbound_calls), tension: 0.25},
+    {label: "ASA", data: trend.map(r => r.avg_asa_sec), tension: 0.25},
+    {label: "AHT", data: trend.map(r => r.avg_talk_sec), tension: 0.25},
+    {label: "ACW", data: trend.map(r => r.avg_acw_sec), tension: 0.25}
+]);
+</script>
+</body>
+</html>

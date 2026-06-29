@@ -1,0 +1,159 @@
+from __future__ import annotations
+
+import os
+
+from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
+
+from app.tool_catalog import get_tool, tools_by_category
+from app.tool_runner import stream_tool_run
+from core.cli import create_client, tool_log
+from core.demo_mode import is_demo_mode
+from core.genesys_client import safe_str
+from core.paths import OUTPUTS_DIR, PROJECT_ROOT, ensure_runtime_dirs
+
+ops_bp = Blueprint("ops", __name__)
+
+
+def _demo_mode() -> bool:
+    from flask import current_app
+    return bool(current_app.config.get("DEMO_MODE")) or is_demo_mode()
+
+
+@ops_bp.route("/")
+def index():
+    demo = _demo_mode()
+    return render_template(
+        "ops/index.html",
+        categories=tools_by_category(),
+        demo_mode=demo,
+    )
+
+
+@ops_bp.route("/health")
+def health():
+    try:
+        client = create_client(log=tool_log)
+        org = client.request("GET", "/api/v2/organizations/me")
+        return jsonify({
+            "ok": True,
+            "demo_mode": _demo_mode(),
+            "organization": org.get("name"),
+            "region": client.region,
+            "api_host": client.api_host,
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@ops_bp.route("/api/tool/<tool_id>")
+def tool_detail(tool_id: str):
+    tool = get_tool(tool_id)
+    if not tool:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(tool)
+
+
+@ops_bp.route("/api/options/<option_type>")
+def api_options(option_type: str):
+    try:
+        client = create_client(log=tool_log)
+        if option_type == "divisions":
+            items = client.paged_get("/api/v2/authorization/divisions")
+            return jsonify([{"value": d.get("name"), "label": d.get("name")} for d in items if d.get("name")])
+
+        if option_type == "queue_ids":
+            items = client.paged_get("/api/v2/routing/queues")
+            return jsonify([
+                {"value": q.get("id"), "label": q.get("name")}
+                for q in items if q.get("id") and q.get("name")
+            ])
+
+        if option_type == "queues":
+            prefix = request.args.get("prefix", "").strip().lower()
+            items = client.paged_get("/api/v2/routing/queues")
+            if prefix:
+                items = [q for q in items if safe_str(q.get("name")).lower().startswith(prefix)]
+            return jsonify([
+                {"value": q.get("name"), "label": q.get("name"), "id": q.get("id")}
+                for q in items if q.get("name")
+            ])
+
+        if option_type == "queue_prefixes":
+            prefixes: set[str] = set()
+            for queue in client.paged_get("/api/v2/routing/queues"):
+                name = safe_str(queue.get("name"))
+                if " - " in name:
+                    prefixes.add(name.split(" - ", 1)[0].strip())
+                elif "_" in name:
+                    prefixes.add(name.split("_", 1)[0].strip())
+            return jsonify([{"value": p, "label": p} for p in sorted(prefixes)])
+
+        if option_type == "groups":
+            items = client.paged_get("/api/v2/groups")
+            return jsonify([{"value": g.get("name"), "label": g.get("name")} for g in items if g.get("name")])
+
+        return jsonify([])
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@ops_bp.route("/download-template/<tool_id>")
+def download_template(tool_id: str):
+    tool = get_tool(tool_id)
+    if not tool or not tool.get("template"):
+        return jsonify({"error": "no template"}), 404
+    return send_from_directory(PROJECT_ROOT / "templates_csv", tool["template"], as_attachment=True)
+
+
+@ops_bp.route("/download-output/<path:filename>")
+def download_output(filename: str):
+    ensure_runtime_dirs()
+    return send_from_directory(OUTPUTS_DIR, filename, as_attachment=True)
+
+
+@ops_bp.route("/run/<tool_id>", methods=["POST"])
+def run_tool(tool_id: str):
+    tool = get_tool(tool_id)
+    if not tool:
+        return Response("[ERROR] Unknown tool\n", mimetype="text/plain", status=404)
+
+    demo = _demo_mode()
+    execute = request.form.get("execute_mode") == "1"
+
+    if demo:
+        execute = False
+    elif execute and tool.get("mutating"):
+        confirm = request.form.get("execute_confirm", "").strip().upper()
+        if confirm != "EXECUTE":
+            return Response(
+                "[ERROR] Execute mode requires typing EXECUTE in the confirmation field.\n",
+                mimetype="text/plain",
+                status=400,
+            )
+
+    form = {key: request.form.get(key, "") for key in request.form.keys()}
+    files = {key: request.files[key] for key in request.files.keys() if request.files[key].filename}
+
+    return Response(
+        stream_tool_run(tool_id, form, files, execute=execute, demo_mode=demo),
+        mimetype="text/plain; charset=utf-8",
+    )
+
+
+def create_app(*, demo_mode: bool = False):
+    from flask import Flask
+
+    if demo_mode:
+        os.environ["OPS_DEMO_MODE"] = "1"
+    elif "OPS_DEMO_MODE" not in os.environ:
+        os.environ.pop("OPS_DEMO_MODE", None)
+
+    app = Flask(
+        __name__,
+        template_folder=str(PROJECT_ROOT / "templates"),
+        static_folder=str(PROJECT_ROOT / "static"),
+    )
+    app.config["DEMO_MODE"] = demo_mode or is_demo_mode()
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "genesys-ops-demo" if demo_mode else "genesys-ops-local")
+    app.register_blueprint(ops_bp)
+    return app

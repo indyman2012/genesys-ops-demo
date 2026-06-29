@@ -1,0 +1,16 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: genesys_admin_beta_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_change_me
+      MYSQL_DATABASE: genesys_admin_beta
+      MYSQL_USER: genesys_admin
+      MYSQL_PASSWORD: change_me
+    ports:
+      - "3306:3306"
+    volumes:
+      - genesys_admin_beta_mysql_data:/var/lib/mysql
+volumes:
+  genesys_admin_beta_mysql_data:

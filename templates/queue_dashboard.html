@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Queue Dashboard</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; }
+        th { background: #eee; }
+    </style>
+</head>
+<body>
+
+<h2>Queue Perspective Dashboard</h2>
+
+<table>
+    <tr>
+        <th>Queue</th>
+        <th>Offered</th>
+        <th>Answered</th>
+        <th>ASA (sec)</th>
+        <th>AHT (sec)</th>
+        <th>ACW (sec)</th>
+    </tr>
+
+    {% for r in rows %}
+    <tr>
+        <td>{{ r.queue_name }}</td>
+        <td>{{ r.offered }}</td>
+        <td>{{ r.answered }}</td>
+        <td>{{ "%.1f"|format(r.asa or 0) }}</td>
+        <td>{{ "%.1f"|format(r.aht or 0) }}</td>
+        <td>{{ "%.1f"|format(r.acw or 0) }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>
