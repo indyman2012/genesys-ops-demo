@@ -1,0 +1,114 @@
+/* Not Responding monitor — uses ArchWell tokens from static/archwell/shell.css */
+
+.monitor-layout {
+  padding: 1rem 1.25rem 2rem;
+  flex: 1 1 auto;
+}
+
+.monitor-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.status-card {
+  background: var(--aw-white);
+  border: 1px solid var(--aw-border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  box-shadow: var(--aw-shadow);
+}
+
+.status-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--aw-muted);
+  font-weight: 700;
+}
+
+.status-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--aw-navy);
+  font-family: var(--font-heading);
+}
+
+.status-value.small {
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+}
+
+.status-value.alert {
+  color: var(--aw-danger);
+}
+
+.monitor-table-wrap {
+  background: var(--aw-white);
+  border: 1px solid var(--aw-border);
+  border-radius: 12px;
+  overflow: auto;
+  box-shadow: var(--aw-shadow);
+}
+
+.monitor-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.monitor-table th,
+.monitor-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--aw-border);
+  text-align: left;
+}
+
+.monitor-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--aw-muted);
+  background: #f8fafb;
+  font-weight: 700;
+}
+
+.monitor-table tbody tr:hover {
+  background: var(--aw-orange-light);
+}
+
+.monitor-table .duration {
+  color: var(--aw-danger);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-table .empty-row td,
+.monitor-table .all-clear td {
+  text-align: center;
+  padding: 2rem;
+  color: var(--aw-muted);
+}
+
+.monitor-table .all-clear td {
+  color: var(--aw-ok);
+  font-weight: 600;
+}
+
+.error-banner {
+  background: var(--aw-orange-light);
+  border: 1px solid #f0cdb8;
+  color: var(--aw-danger);
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.error-banner.hidden {
+  display: none;
+}

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" data-demo-mode="{{ '1' if demo_mode else '0' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Not Responding Monitor — ArchWell Health Ops</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='agent_workspace/archwell-favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/not_responding.css') }}?v=2">
+</head>
+<body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
+  <div class="app-shell">
+  {% if demo_mode %}
+  <div class="demo-banner">
+    <strong>Demo mode</strong> — live read-only monitor. No changes can be applied from this instance.
+  </div>
+  {% endif %}
+
+  <div class="topbar-strip">
+    <span>Contact Center · Admin tools</span>
+  </div>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <p class="page-subtitle">Agents in routing status <strong>Not Responding</strong> for more than 5 minutes</p>
+    </div>
+    <div class="brand">
+      <img
+        class="brand-logo"
+        src="{{ url_for('static', filename='agent_workspace/archwell-logo.svg') }}"
+        alt="ArchWell Health"
+        width="160"
+        height="47"
+      >
+      <div class="brand-sub">Not Responding{% if demo_mode %} <span class="demo-tag">Demo</span>{% endif %}</div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-actions">
+        <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Ops Console</a>
+        <button type="button" id="btn-refresh" class="btn btn-primary">Refresh Now</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="monitor-layout">
+    <section class="monitor-status">
+      <div class="status-card">
+        <span class="status-label">Agents stuck</span>
+        <span id="agent-count" class="status-value">—</span>
+      </div>
+      <div class="status-card">
+        <span class="status-label">Last updated</span>
+        <span id="last-updated" class="status-value small">—</span>
+      </div>
+      <div class="status-card">
+        <span class="status-label">Next refresh</span>
+        <span id="next-refresh" class="status-value small">30s</span>
+      </div>
+      <div class="status-card">
+        <span class="status-label">Query time</span>
+        <span id="query-ms" class="status-value small">—</span>
+      </div>
+    </section>
+
+    <p id="error-banner" class="error-banner hidden"></p>
+
+    <section class="monitor-table-wrap">
+      <table class="monitor-table">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Email</th>
+            <th>Not responding since</th>
+            <th>Duration</th>
+            <th>User ID</th>
+          </tr>
+        </thead>
+        <tbody id="agent-rows">
+          <tr class="empty-row">
+            <td colspan="5">Loading…</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='ops/not_responding.js') }}"></script>
+</body>
+</html>

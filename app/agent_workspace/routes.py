@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, Response, jsonify, render_template, request
 
+from app.agent_workspace.demo_reports import aht_trend_report_html
 from app.agent_workspace.demo_state import demo_state
 from core.paths import PROJECT_ROOT
 
@@ -18,6 +19,25 @@ def index():
         "agent_workspace/index.html",
         demo_mode=bool(current_app.config.get("DEMO_MODE")),
     )
+
+
+@agent_bp.route("/reports")
+def reports():
+    from flask import current_app
+
+    return render_template(
+        "agent_workspace/reports.html",
+        demo_mode=bool(current_app.config.get("DEMO_MODE")),
+    )
+
+
+@agent_bp.route("/reports/aht-trend")
+def reports_aht_trend():
+    from flask import current_app
+
+    prefer_live = not bool(current_app.config.get("DEMO_MODE"))
+    html = aht_trend_report_html(prefer_live=prefer_live)
+    return Response(html, mimetype="text/html; charset=utf-8")
 
 
 @agent_bp.route("/health")

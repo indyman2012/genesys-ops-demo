@@ -201,6 +201,10 @@ class AgentWorkspaceDemo:
             "stats_updated_at": self.stats_updated_at,
             "dial_requires_queue": True,
             "dial_requires_on_queue": False,
+            "nav": {
+                "supervisor": True,
+                "admin": False,
+            },
             "updated_at": _utc_now().isoformat(),
         }
 

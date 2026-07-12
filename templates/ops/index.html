@@ -3,20 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% if demo_mode %}Genesys Cloud Ops — Demo{% else %}Genesys Cloud Ops{% endif %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='ops/ops.css') }}">
+  <title>{% if demo_mode %}ArchWell Health — Ops Console (Demo){% else %}ArchWell Health — Ops Console{% endif %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='agent_workspace/archwell-favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/ops.css') }}?v=2">
 </head>
-<body class="{% if demo_mode %}demo-mode{% endif %}">
+<body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
+  <div class="app-shell">
   {% if demo_mode %}
   <div class="demo-banner">
     <strong>Demo mode</strong> — dry run only. No changes can be applied to Genesys Cloud from this instance.
   </div>
   {% endif %}
 
+  <div class="topbar-strip">
+    <span>Contact Center · Admin tools</span>
+  </div>
+
   <header class="topbar">
-    <div>
-      <h1>Genesys Cloud Ops{% if demo_mode %} <span class="demo-tag">Demo</span>{% endif %}</h1>
-      <p class="subtitle">
+    <div class="topbar-left">
+      <p class="page-subtitle">
         {% if demo_mode %}
           Preview tools safely. Select a tool below to see what it does and run a dry run.
         {% else %}
@@ -24,12 +34,25 @@
         {% endif %}
       </p>
     </div>
-    <div class="topbar-actions">
-      <button type="button" id="btn-health" class="btn secondary">Check Auth</button>
+    <div class="brand">
+      <img
+        class="brand-logo"
+        src="{{ url_for('static', filename='agent_workspace/archwell-logo.svg') }}"
+        alt="ArchWell Health"
+        width="160"
+        height="47"
+      >
+      <div class="brand-sub">Ops Console{% if demo_mode %} <span class="demo-tag">Demo</span>{% endif %}</div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-actions">
+        <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>
+        <button type="button" id="btn-health" class="btn btn-secondary">Check Auth</button>
+      </div>
     </div>
   </header>
 
-  <main class="layout">
+  <main class="ops-layout">
     <aside class="sidebar">
       <label for="tool-select">Tool</label>
       <select id="tool-select">
@@ -47,7 +70,7 @@
       <p id="tool-warning" class="tool-warning hidden"></p>
     </aside>
 
-    <section class="workspace">
+    <section class="ops-workspace">
       <form id="tool-form" class="tool-form hidden">
         <div id="fields-container"></div>
 
@@ -79,9 +102,9 @@
         </div>
 
         <div class="actions">
-          <button type="submit" class="btn primary" id="btn-run-dry">{% if demo_mode %}Run Preview{% else %}Run Dry Run{% endif %}</button>
+          <button type="submit" class="btn btn-primary" id="btn-run-dry">{% if demo_mode %}Run Preview{% else %}Run Dry Run{% endif %}</button>
           {% if not demo_mode %}
-          <button type="submit" class="btn danger hidden" id="btn-run-execute" data-execute="1">Execute Changes</button>
+          <button type="submit" class="btn btn-danger hidden" id="btn-run-execute" data-execute="1">Execute Changes</button>
           {% endif %}
         </div>
       </form>
@@ -102,13 +125,14 @@
             <input type="checkbox" id="clear-before-run" checked>
             Clear before run
           </label>
-          <button type="button" class="btn secondary" id="btn-copy-log">Copy</button>
-          <button type="button" class="btn secondary" id="btn-clear-log">Clear Log</button>
+          <button type="button" class="btn btn-secondary" id="btn-copy-log">Copy</button>
+          <button type="button" class="btn btn-secondary" id="btn-clear-log">Clear Log</button>
         </div>
       </div>
       <pre id="log" aria-live="polite"></pre>
     </section>
   </main>
+  </div>
 
   <script src="{{ url_for('static', filename='ops/ops.js') }}"></script>
 </body>

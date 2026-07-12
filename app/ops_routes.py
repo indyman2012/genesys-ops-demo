@@ -4,6 +4,7 @@ import os
 
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
+from app.not_responding import fetch_not_responding_agents
 from app.tool_catalog import get_tool, tools_by_category
 from app.tool_runner import stream_tool_run
 from core.cli import create_client, tool_log
@@ -27,6 +28,20 @@ def index():
         categories=tools_by_category(),
         demo_mode=demo,
     )
+
+
+@ops_bp.route("/not-responding")
+def not_responding_page():
+    return render_template("ops/not_responding.html", demo_mode=_demo_mode())
+
+
+@ops_bp.route("/api/not-responding")
+def not_responding_api():
+    try:
+        client = create_client(log=tool_log)
+        return jsonify(fetch_not_responding_agents(client))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 @ops_bp.route("/health")

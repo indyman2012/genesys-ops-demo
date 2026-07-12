@@ -1,144 +1,6 @@
-/* ArchWell Health brand tokens — sourced from archwellhealth.com */
-:root {
-  --aw-navy: #0b4c65;
-  --aw-blue: #247a96;
-  --aw-blue-light: #75c5d7;
-  --aw-orange: #fa6400;
-  --aw-orange-mark: #e76400;
-  --aw-orange-light: #fdefe6;
-  --aw-yellow: #ffd537;
-  --aw-gray-body: #043649;
-  --aw-heading: #0f172a;
-  --aw-white: #ffffff;
-  --aw-bg: #ffffff;
-  --aw-border: #d6e4ea;
-  --aw-muted: #5b7280;
-  --aw-danger: #c0392b;
-  --aw-shadow: 0 8px 24px rgba(4, 54, 73, 0.08);
-  --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
-  --font-heading: collier, Georgia, "Times New Roman", serif;
-}
+/* Agent workspace layout — requires static/archwell/shell.css */
 
-* { box-sizing: border-box; }
-
-html,
-body {
-  height: 100%;
-  overflow: hidden;
-}
-
-body {
-  margin: 0;
-  font-family: var(--font-body);
-  background: var(--aw-bg);
-  color: var(--aw-gray-body);
-  font-size: 16px;
-  line-height: 1.45;
-}
-
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-}
-
-.viewport-scale {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.viewport-scale-inner {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-}
-
-.hidden { display: none !important; }
-
-/* Demo banner — orange tint like site dropdowns */
-.demo-banner {
-  background: var(--aw-orange-light);
-  color: var(--aw-gray-body);
-  text-align: center;
-  padding: 0.35rem 0.75rem;
-  font-size: clamp(0.7rem, 1.6vh, 0.875rem);
-  border-bottom: 1px solid #f0cdb8;
-  flex-shrink: 0;
-}
-
-.demo-banner strong {
-  color: var(--aw-orange);
-}
-
-/* Navy utility strip + white main header (mirrors site) */
-.topbar-strip {
-  background: var(--aw-navy);
-  color: var(--aw-white);
-  padding: 0.2rem 1rem;
-  font-size: clamp(0.65rem, 1.4vh, 0.8rem);
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.topbar-strip span {
-  opacity: 0.92;
-}
-
-.topbar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 1.25rem;
-  background: var(--aw-white);
-  border-bottom: 1px solid var(--aw-border);
-  box-shadow: var(--aw-shadow);
-  flex-shrink: 0;
-}
-
-.topbar-left {
-  min-width: 0;
-}
-
-.brand {
-  grid-column: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  text-align: center;
-}
-
-.brand-logo {
-  display: block;
-  width: 160px;
-  height: auto;
-}
-
-.brand-sub {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  color: var(--aw-blue);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.topbar-right {
-  grid-column: 3;
-  justify-self: end;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.15rem;
-}
+.hint.realtime { margin-top: -0.35rem; margin-bottom: 0.75rem; }
 
 .queue-field {
   margin-bottom: 0.85rem;
@@ -171,14 +33,6 @@ body {
   outline: 2px solid var(--aw-blue-light);
   outline-offset: 1px;
 }
-
-.agent-name {
-  font-weight: 700;
-  color: var(--aw-navy);
-}
-
-.muted { color: var(--aw-muted); }
-.small { font-size: 0.75rem; }
 
 .workspace {
   display: grid;
@@ -239,96 +93,15 @@ body {
   max-height: 280px;
 }
 
-.card {
-  background: var(--aw-white);
-  border: 1px solid var(--aw-border);
-  border-radius: 16px;
-  padding: 0.85rem 1rem;
-  box-shadow: var(--aw-shadow);
-}
-
-.card h2 {
-  margin: 0 0 0.6rem;
-  font-family: var(--font-heading);
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--aw-blue);
-}
-
-.hint {
-  font-size: 0.8rem;
-  color: var(--aw-muted);
-  margin: 0.35rem 0 0.65rem;
-  line-height: 1.45;
-}
-
-.hint.warn { color: #9a5b00; }
-.hint.realtime { margin-top: -0.35rem; margin-bottom: 0.75rem; }
-
 .on-queue-row {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
 }
 
-/* Pill buttons like archwellhealth.com */
-.btn {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--aw-orange);
-  color: var(--aw-white);
-  border-color: var(--aw-orange);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--aw-yellow);
-  color: var(--aw-navy);
-  border-color: var(--aw-yellow);
-}
-
-.btn-secondary {
-  background: var(--aw-white);
-  color: var(--aw-blue);
-  border-color: var(--aw-orange);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--aw-yellow);
-  color: var(--aw-navy);
-  border-color: var(--aw-yellow);
-}
-
 .btn-accent {
-  background: var(--aw-orange);
-  color: var(--aw-white);
   width: 100%;
   margin-top: 0.5rem;
-  border-color: var(--aw-orange);
-}
-
-.btn-accent:hover:not(:disabled) {
-  background: var(--aw-yellow);
-  color: var(--aw-navy);
-  border-color: var(--aw-yellow);
-}
-
-.btn-danger {
-  background: var(--aw-danger);
-  color: var(--aw-white);
 }
 
 .status-pill {
@@ -366,24 +139,6 @@ body {
   font-size: 0.8rem;
   color: var(--aw-navy);
   font-weight: 700;
-}
-
-input[type="tel"],
-input[type="text"],
-select {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--aw-border);
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-family: var(--font-body);
-  color: var(--aw-gray-body);
-}
-
-input:focus,
-select:focus {
-  outline: 2px solid var(--aw-blue-light);
-  outline-offset: 1px;
 }
 
 .call-card { min-height: 0; }
@@ -552,7 +307,7 @@ select:focus {
   font-size: clamp(0.75rem, 2.8cqh, 0.9rem);
 }
 
-.badge {
+.badge.direction {
   font-size: clamp(0.65rem, 2.2cqh, 0.75rem);
   font-weight: 700;
   letter-spacing: 0.04em;

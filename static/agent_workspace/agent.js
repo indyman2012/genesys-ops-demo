@@ -49,6 +49,16 @@
     $("agent-name").textContent = state.agent_name;
     $("updated-at").textContent = "Updated " + formatTime(state.updated_at);
 
+    const nav = state.nav || {};
+    const roleNav = $("role-nav");
+    if (roleNav) {
+      const showSupervisor = !!nav.supervisor;
+      const showAdmin = !!nav.admin;
+      roleNav.classList.toggle("hidden", !showSupervisor && !showAdmin);
+      const supervisorLink = $("nav-supervisor");
+      if (supervisorLink) supervisorLink.classList.toggle("hidden", !showSupervisor);
+    }
+
     const select = $("queue-select");
     if (!queueSelectDirty || select.options.length === 0) {
       const prev = select.value;

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArchWell Health — Supervisor Reports{% if demo_mode %} (Demo){% endif %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='agent_workspace/archwell-favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+</head>
+<body class="reports-page{% if demo_mode %} demo-mode{% endif %}">
+  <div class="app-shell">
+  {% if demo_mode %}
+  <div class="demo-banner">
+    <strong>DEMO MODE</strong> — Supervisor report console preview. Additional reports will be added during pilot.
+  </div>
+  {% endif %}
+
+  <div class="topbar-strip">
+    <span>Contact Center · Supervisor reports</span>
+  </div>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="{{ url_for('agent.index') }}" class="role-nav-link back-link">← Agent workspace</a>
+    </div>
+    <div class="brand">
+      <img
+        class="brand-logo"
+        src="{{ url_for('static', filename='agent_workspace/archwell-logo.svg') }}"
+        alt="ArchWell Health"
+        width="160"
+        height="47"
+      >
+      <div class="brand-sub">Supervisor Reports</div>
+    </div>
+    <div class="topbar-right" aria-hidden="true"></div>
+  </header>
+
+  <main class="reports-main">
+    <section class="card reports-intro">
+      <h2>Report console</h2>
+      <p class="reports-more-note">
+        More supervisor reports are on the way — callback conversion, spam and short abandon,
+        repeat callers, direct outbound, and queue activity summaries will be added here during pilot.
+        For now, start with inbound voice handle time trends.
+      </p>
+    </section>
+
+    <section class="card reports-embed-card">
+      <div class="reports-embed-header">
+        <h2>AHT component trend</h2>
+        <span class="hint">Biweekly inbound voice · 4-week handle / talk / hold / ACW</span>
+      </div>
+      <iframe
+        class="reports-embed-frame"
+        src="{{ url_for('agent.reports_aht_trend') }}"
+        title="AHT component trend report"
+        loading="lazy"
+      ></iframe>
+    </section>
+  </main>
+  </div>
+</body>
+</html>

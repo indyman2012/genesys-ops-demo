@@ -9,9 +9,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=9">
 </head>
-<body class="{% if demo_mode %}demo-mode{% endif %}">
+<body class="agent-page{% if demo_mode %} demo-mode{% endif %}">
   <div class="app-shell">
   {% if demo_mode %}
   <div class="demo-banner">
@@ -36,6 +37,9 @@
       <div class="brand-sub">Agent Workspace</div>
     </div>
     <div class="topbar-right">
+      <nav id="role-nav" class="role-nav{% if not demo_mode %} hidden{% endif %}">
+        <a id="nav-supervisor" class="role-nav-link" href="{{ url_for('agent.reports') }}">Supervisor</a>
+      </nav>
       <span id="agent-name" class="agent-name"></span>
       <span id="updated-at" class="muted small"></span>
     </div>
@@ -100,7 +104,7 @@
         <div id="call-active" class="call-active hidden">
           <div class="call-display">
             <div class="call-meta">
-              <span id="call-direction" class="badge"></span>
+              <span id="call-direction" class="badge direction"></span>
               <span id="call-queue" class="muted call-queue-name"></span>
             </div>
             <div id="call-caller" class="call-caller"></div>
@@ -182,6 +186,6 @@
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=6"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=7"></script>
 </body>
 </html>
