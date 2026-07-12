@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=7">
 </head>
 <body class="{% if demo_mode %}demo-mode{% endif %}">
   <div class="app-shell">
@@ -88,8 +88,15 @@
 
     <section class="panel panel-center">
       <div class="card call-card">
-        <h2>Current interaction</h2>
-        <div id="call-empty" class="empty-state">No active call — go on queue to receive work.</div>
+        <h2 id="call-panel-title">Calls waiting</h2>
+        <div id="call-waiting" class="call-waiting">
+          <div class="waiting-header">
+            <span id="waiting-count" class="waiting-count">0 waiting</span>
+            <span class="hint realtime">Real-time · selected queue</span>
+          </div>
+          <ul id="waiting-list" class="waiting-list"></ul>
+          <p id="waiting-empty" class="waiting-empty hidden">No calls waiting in this queue.</p>
+        </div>
         <div id="call-active" class="call-active hidden">
           <div class="call-display">
             <div class="call-meta">
@@ -175,6 +182,6 @@
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=5"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=6"></script>
 </body>
 </html>

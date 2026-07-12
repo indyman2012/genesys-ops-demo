@@ -49,6 +49,16 @@ MEMBER_SEEDS = [
     ("Riley Adams", "off_queue"),
 ]
 
+WAITING_CALL_SEEDS = [
+    ("Memphis TN", "+1 (901) 497-5151"),
+    ("Nashville TN", "+1 (615) 555-0142"),
+    ("Birmingham AL", "+1 (205) 555-0198"),
+    ("Jacksonville FL", "+1 (904) 555-0167"),
+    ("St. Louis MO", "+1 (314) 555-0133"),
+    ("Callback — M. Johnson", "+1 (901) 555-0188"),
+    ("Little Rock AR", "+1 (501) 555-0174"),
+]
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -103,6 +113,34 @@ class AgentWorkspaceDemo:
                 "service_level_pct": round(random.uniform(72, 92), 1),
                 "asa_sec": random.randint(22, 58),
             }
+        self._waiting_state: dict[str, list[dict[str, Any]]] = {
+            queue["id"]: self._seed_waiting_calls(queue["id"])
+            for queue in DEMO_QUEUES
+        }
+
+    def _seed_waiting_calls(self, queue_id: str) -> list[dict[str, Any]]:
+        count = 2 + (hash(queue_id) % 4)
+        calls = []
+        for index in range(count):
+            name, number = WAITING_CALL_SEEDS[index % len(WAITING_CALL_SEEDS)]
+            calls.append({
+                "id": str(uuid.uuid4()),
+                "caller_name": name,
+                "caller_number": number,
+                "wait_sec": random.randint(18, 220) + index * 12,
+                "is_callback": name.startswith("Callback"),
+            })
+        return sorted(calls, key=lambda item: item["wait_sec"], reverse=True)
+
+    def _new_waiting_call(self) -> dict[str, Any]:
+        name, number = random.choice(WAITING_CALL_SEEDS)
+        return {
+            "id": str(uuid.uuid4()),
+            "caller_name": name,
+            "caller_number": number,
+            "wait_sec": random.randint(4, 20),
+            "is_callback": name.startswith("Callback"),
+        }
 
     def queue_by_id(self, queue_id: str) -> dict[str, Any] | None:
         for queue in DEMO_QUEUES:
@@ -129,6 +167,14 @@ class AgentWorkspaceDemo:
                     member["status"] = "on_call"
                 elif member["status"] == "off_queue" and random.random() < 0.2:
                     member["status"] = "on_queue"
+        waiting = self._waiting_state[queue_id]
+        for call in waiting:
+            call["wait_sec"] += random.randint(4, 9)
+        if random.random() < 0.18 and len(waiting) < 8:
+            waiting.append(self._new_waiting_call())
+            waiting.sort(key=lambda item: item["wait_sec"], reverse=True)
+        if random.random() < 0.12 and waiting:
+            waiting.pop(random.randrange(len(waiting)))
 
     def snapshot(self, *, jitter: bool = True) -> dict[str, Any]:
         queue_id = self.selected_queue_id
@@ -146,6 +192,7 @@ class AgentWorkspaceDemo:
             "queues": DEMO_QUEUES,
             "media": self.media,
             "current_call": deepcopy(self.current_call),
+            "calls_waiting": deepcopy(self._waiting_state[queue_id]),
             "wrapup_codes": WRAPUP_CODES,
             "membership": deepcopy(self._member_state[queue_id]),
             "activity": activity,
@@ -178,10 +225,18 @@ class AgentWorkspaceDemo:
         if self.current_call or not self.on_queue:
             return None
         queue = self.queue_by_id(self.selected_queue_id) or DEMO_QUEUES[0]
+        waiting = self._waiting_state[self.selected_queue_id]
+        if waiting:
+            next_call = waiting.pop(0)
+            caller_name = next_call["caller_name"]
+            caller_number = next_call["caller_number"]
+        else:
+            caller_name = "Memphis TN"
+            caller_number = "+1 (901) 497-5151"
         self.current_call = {
             "direction": "inbound",
-            "caller_name": "Memphis TN",
-            "caller_number": "+1 (901) 497-5151",
+            "caller_name": caller_name,
+            "caller_number": caller_number,
             "queue_name": queue["name"],
             "started_at": _utc_now().isoformat(),
             "connected": False,

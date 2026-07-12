@@ -28,6 +28,14 @@
     }
   }
 
+  function formatWait(seconds) {
+    const total = Math.max(0, parseInt(seconds, 10) || 0);
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    if (mins === 0) return secs + "s";
+    return mins + ":" + String(secs).padStart(2, "0");
+  }
+
   function memberLabel(status) {
     return {
       on_queue: "On queue",
@@ -74,8 +82,41 @@
     $("btn-sim-inbound").disabled = !onQueue || !!state.current_call;
 
     const call = state.current_call;
-    $("call-empty").classList.toggle("hidden", !!call);
+    const waitingPanel = $("call-waiting");
+    const panelTitle = $("call-panel-title");
+    waitingPanel.classList.toggle("hidden", !!call);
     $("call-active").classList.toggle("hidden", !call);
+    panelTitle.textContent = call ? "Current interaction" : "Calls waiting";
+
+    if (!call) {
+      const waiting = state.calls_waiting || [];
+      $("waiting-count").textContent =
+        waiting.length === 1 ? "1 call waiting" : waiting.length + " calls waiting";
+      const list = $("waiting-list");
+      list.innerHTML = "";
+      $("waiting-empty").classList.toggle("hidden", waiting.length > 0);
+      list.classList.toggle("hidden", waiting.length === 0);
+      waiting.forEach((item, index) => {
+        const li = document.createElement("li");
+        li.className = "waiting-item" + (index === 0 ? " leading" : "");
+        const waitLabel = formatWait(item.wait_sec);
+        const longWait = (item.wait_sec || 0) >= 120;
+        li.innerHTML =
+          '<div class="waiting-caller">' +
+          (item.is_callback ? '<span class="waiting-badge">Callback</span>' : "") +
+          escapeHtml(item.caller_name) +
+          "</div>" +
+          '<div class="waiting-number">' +
+          escapeHtml(item.caller_number) +
+          "</div>" +
+          '<span class="waiting-wait' +
+          (longWait ? " long" : "") +
+          '">' +
+          waitLabel +
+          "</span>";
+        list.appendChild(li);
+      });
+    }
 
     if (call) {
       $("call-direction").textContent = call.direction;
@@ -161,20 +202,11 @@
       const card = document.querySelector(".panel-center .call-card");
       if (!card) return;
 
-      const empty = $("call-empty");
       const display = document.querySelector(".call-display");
       const title = card.querySelector("h2");
       const titleHeight = title ? title.offsetHeight + 12 : 0;
 
-      if (empty && !empty.classList.contains("hidden")) {
-        empty.style.fontSize = "";
-        let size = 16;
-        empty.style.fontSize = size + "px";
-        const maxHeight = card.clientHeight - titleHeight - 16;
-        while (size > 11 && empty.scrollHeight > maxHeight) {
-          size -= 1;
-          empty.style.fontSize = size + "px";
-        }
+      if ($("call-waiting") && !$("call-waiting").classList.contains("hidden")) {
         return;
       }
 
