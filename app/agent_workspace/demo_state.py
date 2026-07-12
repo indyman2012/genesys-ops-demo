@@ -153,6 +153,7 @@ class AgentWorkspaceDemo:
             "agent_stats": deepcopy(self.agent_stats),
             "stats_updated_at": self.stats_updated_at,
             "dial_requires_queue": True,
+            "dial_requires_on_queue": False,
             "updated_at": _utc_now().isoformat(),
         }
 
@@ -195,10 +196,8 @@ class AgentWorkspaceDemo:
         return self.current_call
 
     def dial_on_behalf(self, phone_number: str) -> dict[str, Any] | None:
-        if not self.on_queue:
-            return None
         queue = self.queue_by_id(self.selected_queue_id)
-        if not queue:
+        if not queue or self.current_call:
             return None
         self.current_call = {
             "direction": "outbound",

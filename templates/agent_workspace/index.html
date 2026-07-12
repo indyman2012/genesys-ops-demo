@@ -3,27 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Archwell Agent Workspace{% if demo_mode %} — Demo{% endif %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}">
+  <title>ArchWell Health — Agent Workspace{% if demo_mode %} (Demo){% endif %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='agent_workspace/archwell-favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=6">
 </head>
 <body class="{% if demo_mode %}demo-mode{% endif %}">
+  <div class="app-shell">
   {% if demo_mode %}
   <div class="demo-banner">
     <strong>DEMO MODE</strong> — Simulated calls, queue activity, and stats for socialization. No Genesys connection.
   </div>
   {% endif %}
 
+  <div class="topbar-strip">
+    <span>Contact Center · Internal use</span>
+  </div>
+
   <header class="topbar">
+    <div class="topbar-left" aria-hidden="true"></div>
     <div class="brand">
-      <span class="brand-mark">AH</span>
-      <div>
-        <div class="brand-title">Archwell Health</div>
-        <div class="brand-sub">Agent Workspace</div>
-      </div>
-    </div>
-    <div class="topbar-center">
-      <label class="queue-label" for="queue-select">Active queue</label>
-      <select id="queue-select" aria-label="Select queue"></select>
+      <img
+        class="brand-logo"
+        src="{{ url_for('static', filename='agent_workspace/archwell-logo.svg') }}"
+        alt="ArchWell Health"
+        width="160"
+        height="47"
+      >
+      <div class="brand-sub">Agent Workspace</div>
     </div>
     <div class="topbar-right">
       <span id="agent-name" class="agent-name"></span>
@@ -31,10 +41,16 @@
     </div>
   </header>
 
+  <div id="viewport-scale" class="viewport-scale">
+    <div id="viewport-scale-inner" class="viewport-scale-inner">
   <main class="workspace">
     <aside class="panel panel-left">
       <section class="card">
         <h2>Queue status</h2>
+        <div class="queue-field">
+          <label class="queue-label" for="queue-select">Active queue</label>
+          <select id="queue-select" aria-label="Select queue"></select>
+        </div>
         <div class="on-queue-row">
           <button type="button" id="btn-on-queue" class="btn btn-primary">Go On Queue</button>
           <button type="button" id="btn-off-queue" class="btn btn-secondary">Go Off Queue</button>
@@ -43,7 +59,16 @@
       </section>
 
       <section class="card">
+        <h2>Outbound (queue only)</h2>
+        <p class="hint">Dial on behalf of the selected queue — caller ID stays masked.</p>
+        <input type="tel" id="dial-number" placeholder="(901) 555-0100" autocomplete="off">
+        <button type="button" id="btn-dial" class="btn btn-accent" disabled>Dial on behalf</button>
+        <p id="dial-hint" class="hint warn hidden">End the current call to dial on behalf.</p>
+      </section>
+
+      <section class="card">
         <h2>Media</h2>
+        <p class="hint">Read-only in demo · device picker in production.</p>
         <div class="media-row">
           <span class="label">Microphone</span>
           <span id="media-mic" class="value"></span>
@@ -53,14 +78,6 @@
           <span id="media-speaker" class="value"></span>
         </div>
         <p id="webrtc-status" class="webrtc-ok">WebRTC ready</p>
-      </section>
-
-      <section class="card">
-        <h2>Outbound (queue only)</h2>
-        <p class="hint">Dial on behalf of the selected queue — caller ID stays masked.</p>
-        <input type="tel" id="dial-number" placeholder="(901) 555-0100" autocomplete="off">
-        <button type="button" id="btn-dial" class="btn btn-accent" disabled>Dial on behalf</button>
-        <p id="dial-hint" class="hint warn">Select a queue and go on queue to enable dialing.</p>
       </section>
 
       <section class="card demo-tools">
@@ -74,21 +91,25 @@
         <h2>Current interaction</h2>
         <div id="call-empty" class="empty-state">No active call — go on queue to receive work.</div>
         <div id="call-active" class="call-active hidden">
-          <div class="call-meta">
-            <span id="call-direction" class="badge"></span>
-            <span id="call-queue" class="muted"></span>
+          <div class="call-display">
+            <div class="call-meta">
+              <span id="call-direction" class="badge"></span>
+              <span id="call-queue" class="muted call-queue-name"></span>
+            </div>
+            <div id="call-caller" class="call-caller"></div>
+            <div id="call-number" class="call-number"></div>
+            <div id="call-on-behalf" class="on-behalf hidden"></div>
           </div>
-          <div id="call-caller" class="call-caller"></div>
-          <div id="call-number" class="call-number"></div>
-          <div id="call-on-behalf" class="on-behalf hidden"></div>
-          <div class="call-actions">
-            <button type="button" id="btn-answer" class="btn btn-primary hidden">Answer</button>
-            <button type="button" id="btn-hangup" class="btn btn-danger">End call</button>
-          </div>
-          <div id="wrapup-panel" class="wrapup-panel hidden">
-            <label for="wrapup-select">Wrap-up code</label>
-            <select id="wrapup-select"></select>
-            <button type="button" id="btn-wrapup" class="btn btn-primary">Submit wrap-up</button>
+          <div class="call-footer">
+            <div class="call-actions">
+              <button type="button" id="btn-answer" class="btn btn-primary hidden">Answer</button>
+              <button type="button" id="btn-hangup" class="btn btn-danger">End call</button>
+            </div>
+            <div id="wrapup-panel" class="wrapup-panel hidden">
+              <label for="wrapup-select">Wrap-up code</label>
+              <select id="wrapup-select"></select>
+              <button type="button" id="btn-wrapup" class="btn btn-primary">Submit wrap-up</button>
+            </div>
           </div>
         </div>
       </div>
@@ -133,8 +154,10 @@
 
   <footer class="footer-stats">
     <div class="footer-inner">
-      <h2>Your statistics</h2>
-      <p class="hint">Refreshes every 30 minutes · <span id="stats-updated"></span></p>
+      <div class="footer-title">
+        <h2>Your statistics</h2>
+        <p class="hint footer-updated">30-min refresh · <span id="stats-updated"></span></p>
+      </div>
       <div class="stats-grid">
         <div class="stat"><span class="stat-label">Handled today</span><span id="stat-handled" class="stat-value">—</span></div>
         <div class="stat"><span class="stat-label">Avg handle</span><span id="stat-aht" class="stat-value">—</span></div>
@@ -142,13 +165,16 @@
         <div class="stat"><span class="stat-label">Avg ACW</span><span id="stat-acw" class="stat-value">—</span></div>
         <div class="stat"><span class="stat-label">Callbacks due</span><span id="stat-callbacks" class="stat-value">—</span></div>
       </div>
-      <button type="button" id="btn-refresh-stats" class="btn btn-secondary small">Refresh now (demo)</button>
+      <button type="button" id="btn-refresh-stats" class="btn btn-secondary small footer-refresh">Refresh</button>
     </div>
   </footer>
+    </div>
+  </div>
+  </div>
 
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=5"></script>
 </body>
 </html>

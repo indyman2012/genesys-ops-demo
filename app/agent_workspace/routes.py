@@ -87,10 +87,10 @@ def api_dial():
     phone = (payload.get("phone_number") or "").strip()
     if not phone:
         return jsonify({"error": "phone_number required"}), 400
-    if not demo_state.on_queue:
-        return jsonify({"error": "Go on queue before dialing on behalf of a workgroup"}), 400
     call = demo_state.dial_on_behalf(phone)
     if not call:
+        if demo_state.current_call:
+            return jsonify({"error": "End the current call before dialing"}), 400
         return jsonify({"error": "Select a queue first"}), 400
     return jsonify(demo_state.snapshot(jitter=False))
 
@@ -123,6 +123,8 @@ def create_app(*, demo_mode: bool = False):
         static_folder=str(PROJECT_ROOT / "static"),
     )
     app.config["DEMO_MODE"] = demo_mode or os.environ.get("AGENT_DEMO_MODE") == "1"
+    if app.config["DEMO_MODE"]:
+        app.config["TEMPLATES_AUTO_RELOAD"] = True
     app.secret_key = os.environ.get(
         "FLASK_SECRET_KEY",
         "genesys-agent-demo" if demo_mode else "genesys-agent-local",

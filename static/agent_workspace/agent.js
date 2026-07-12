@@ -68,7 +68,7 @@
     $("webrtc-status").textContent = state.media.webrtc_ready ? "WebRTC ready" : "WebRTC not ready";
     $("webrtc-status").className = state.media.webrtc_ready ? "webrtc-ok" : "hint warn";
 
-    const canDial = onQueue && !state.current_call;
+    const canDial = !state.current_call;
     $("btn-dial").disabled = !canDial;
     $("dial-hint").classList.toggle("hidden", canDial);
     $("btn-sim-inbound").disabled = !onQueue || !!state.current_call;
@@ -153,6 +153,81 @@
     $("stats-updated").textContent = state.stats_updated_at
       ? "last " + formatTime(state.stats_updated_at)
       : "";
+    fitCallDisplay();
+  }
+
+  function fitCallDisplay() {
+    requestAnimationFrame(() => {
+      const card = document.querySelector(".panel-center .call-card");
+      if (!card) return;
+
+      const empty = $("call-empty");
+      const display = document.querySelector(".call-display");
+      const title = card.querySelector("h2");
+      const titleHeight = title ? title.offsetHeight + 12 : 0;
+
+      if (empty && !empty.classList.contains("hidden")) {
+        empty.style.fontSize = "";
+        let size = 16;
+        empty.style.fontSize = size + "px";
+        const maxHeight = card.clientHeight - titleHeight - 16;
+        while (size > 11 && empty.scrollHeight > maxHeight) {
+          size -= 1;
+          empty.style.fontSize = size + "px";
+        }
+        return;
+      }
+
+      if (!display || $("call-active").classList.contains("hidden")) return;
+
+      ["call-caller", "call-number", "call-on-behalf"].forEach((id) => {
+        const el = $(id);
+        if (el) el.style.fontSize = "";
+      });
+
+      const maxHeight = display.clientHeight;
+      if (maxHeight <= 0) return;
+
+      const targets = [
+        { id: "call-caller", min: 14, max: 38 },
+        { id: "call-number", min: 12, max: 19 },
+        { id: "call-on-behalf", min: 11, max: 14 },
+      ];
+
+      targets.forEach(({ id, min, max }) => {
+        const el = $(id);
+        if (!el || el.classList.contains("hidden") || !el.textContent) return;
+        let size = max;
+        el.style.fontSize = size + "px";
+        while (size > min && display.scrollHeight > maxHeight) {
+          size -= 1;
+          el.style.fontSize = size + "px";
+        }
+      });
+
+      let passes = 0;
+      while (display.scrollHeight > maxHeight && passes++ < 30) {
+        targets.forEach(({ id, min }) => {
+          const el = $(id);
+          if (!el || el.classList.contains("hidden")) return;
+          const size = parseFloat(window.getComputedStyle(el).fontSize);
+          if (size > min) el.style.fontSize = size - 1 + "px";
+        });
+      }
+    });
+  }
+
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(fitCallDisplay, 100);
+  });
+
+  if (window.ResizeObserver) {
+    const card = document.querySelector(".panel-center .call-card");
+    if (card) {
+      new ResizeObserver(() => fitCallDisplay()).observe(card);
+    }
   }
 
   function escapeHtml(text) {
@@ -247,7 +322,7 @@
     post("/api/stats/refresh", {}).catch(alert);
   });
 
-  refresh();
+  refresh().then(() => fitCallDisplay());
   setInterval(() => refresh(), POLL_REALTIME_MS);
   setInterval(() => post("/api/stats/refresh", {}), POLL_STATS_MS);
 })();

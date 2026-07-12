@@ -22,7 +22,7 @@ Health check: **http://127.0.0.1:8082/agent/health**
 
 ### Layout (v1 demo)
 
-- **Upper left:** On Queue / Off Queue, media status, dial-on-behalf (queue required)
+- **Upper left:** On Queue / Off Queue, media status, dial-on-behalf (queue selected — on queue not required)
 - **Center top:** Current call / wrap-up
 - **Center bottom:** Queue collaborate chat
 - **Right top:** Queue membership (simulated real-time, 5s refresh)
