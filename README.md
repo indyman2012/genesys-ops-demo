@@ -13,6 +13,21 @@ python ops_app.py
 
 Open: **http://127.0.0.1:8080**
 
+**Demo (preview only, no execute):** see [README-DEMO.md](README-DEMO.md) — `python ops_app_demo.py` on port **8081**.
+
+## Agent Workspace (Flask UI — demo)
+
+Simplified agent shell for new hires: queue-only dial, collaborate chat, membership, and activity panels.
+
+```powershell
+cd "C:\Users\douglash\Desktop\Python Files\GenesysCloudToolkit"
+python agent_app_demo.py
+```
+
+Open: **http://127.0.0.1:8082/agent**
+
+Full setup and Render deploy: [README-AGENT-DEMO.md](README-AGENT-DEMO.md)
+
 - Tool picker grouped by category (dropdown)
 - Dynamic forms with API-backed dropdowns (divisions, queues, groups, queue prefixes)
 - CSV template download where available
