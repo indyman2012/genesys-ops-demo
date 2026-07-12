@@ -51,9 +51,10 @@
 
     const nav = state.nav || {};
     const roleNav = $("role-nav");
+    const demoNav = window.AGENT_DEMO_MODE === true || window.AGENT_DEMO_MODE === "true";
     if (roleNav) {
-      const showSupervisor = !!nav.supervisor;
-      const showAdmin = !!nav.admin;
+      const showSupervisor = demoNav || !!nav.supervisor;
+      const showAdmin = demoNav || !!nav.admin;
       roleNav.classList.toggle("hidden", !showSupervisor && !showAdmin);
       const supervisorLink = $("nav-supervisor");
       if (supervisorLink) supervisorLink.classList.toggle("hidden", !showSupervisor);
