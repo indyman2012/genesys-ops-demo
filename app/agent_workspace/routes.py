@@ -6,6 +6,7 @@ from flask import Blueprint, Response, jsonify, render_template, request
 
 from app.agent_workspace.demo_reports import aht_trend_report_html
 from app.agent_workspace.demo_state import demo_state
+from core.config import genesys_analytics_dashboards_url
 from core.paths import PROJECT_ROOT
 
 agent_bp = Blueprint("agent", __name__, url_prefix="/agent")
@@ -28,6 +29,7 @@ def reports():
     return render_template(
         "agent_workspace/reports.html",
         demo_mode=bool(current_app.config.get("DEMO_MODE")),
+        genesys_analytics_url=genesys_analytics_dashboards_url(),
     )
 
 

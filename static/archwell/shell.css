@@ -392,11 +392,104 @@ code {
   line-height: 1.5;
 }
 
-.reports-embed-card {
+.reports-embed-card,
+.reports-tabbed-card {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.reports-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+}
+
+.reports-tab-btn {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--aw-navy);
+  background: var(--aw-white);
+  border: 1px solid var(--aw-border);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.reports-tab-btn:hover,
+.reports-tab-btn:focus {
+  border-color: var(--aw-blue);
+  color: var(--aw-blue);
+}
+
+.reports-tab-btn.is-active {
+  color: var(--aw-white);
+  background: var(--aw-orange);
+  border-color: var(--aw-orange);
+}
+
+.reports-tab-btn.is-active:hover,
+.reports-tab-btn.is-active:focus {
+  color: var(--aw-navy);
+  background: var(--aw-yellow);
+  border-color: var(--aw-yellow);
+}
+
+.reports-tab-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.reports-genesys-note {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  background: var(--aw-orange-light);
+  color: var(--aw-gray-body);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.reports-genesys-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.reports-popup-btn {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--aw-white);
+  background: var(--aw-navy);
+  border: 1px solid var(--aw-navy);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+
+.reports-popup-btn:hover,
+.reports-popup-btn:focus {
+  background: var(--aw-blue);
+  border-color: var(--aw-blue);
+}
+
+.reports-genesys-hint {
+  margin: 0;
+  color: var(--aw-muted);
+  font-size: 0.82rem;
 }
 
 .reports-embed-header {

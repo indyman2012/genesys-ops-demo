@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=2">
 </head>
 <body class="reports-page{% if demo_mode %} demo-mode{% endif %}">
   <div class="app-shell">
@@ -44,25 +44,95 @@
     <section class="card reports-intro">
       <h2>Report console</h2>
       <p class="reports-more-note">
-        More supervisor reports are on the way — callback conversion, spam and short abandon,
-        repeat callers, direct outbound, and queue activity summaries will be added here during pilot.
-        For now, start with inbound voice handle time trends.
+        Switch between native Genesys Analytics and ArchWell custom reports.
+        The header above stays put — use <strong>← Agent workspace</strong> to return anytime.
       </p>
     </section>
 
-    <section class="card reports-embed-card">
-      <div class="reports-embed-header">
-        <h2>AHT component trend</h2>
-        <span class="hint">Biweekly inbound voice · 4-week handle / talk / hold / ACW</span>
+    <section class="card reports-tabbed-card">
+      <div class="reports-tab-bar" role="tablist" aria-label="Report sources">
+        <button
+          type="button"
+          class="reports-tab-btn"
+          role="tab"
+          id="tab-genesys"
+          data-report-tab="genesys"
+          aria-selected="false"
+          aria-controls="panel-genesys"
+        >
+          Genesys Native
+        </button>
+        <button
+          type="button"
+          class="reports-tab-btn is-active"
+          role="tab"
+          id="tab-custom"
+          data-report-tab="custom"
+          aria-selected="true"
+          aria-controls="panel-custom"
+        >
+          Custom AWH
+        </button>
       </div>
-      <iframe
-        class="reports-embed-frame"
-        src="{{ url_for('agent.reports_aht_trend') }}"
-        title="AHT component trend report"
-        loading="lazy"
-      ></iframe>
+
+      <div
+        id="panel-genesys"
+        class="reports-tab-panel hidden"
+        role="tabpanel"
+        aria-labelledby="tab-genesys"
+        data-report-panel="genesys"
+      >
+        <div class="reports-embed-header">
+          <h2>Genesys Analytics Workspace</h2>
+          <span class="hint">Built-in dashboards supervisors already use in Genesys Cloud</span>
+        </div>
+        {% if demo_mode %}
+        <p class="reports-genesys-note">
+          Demo hosts cannot embed Genesys login. In production, Analytics loads inline when your org allows iframe embedding.
+        </p>
+        {% endif %}
+        <div class="reports-genesys-actions">
+          <button type="button" class="reports-popup-btn" data-genesys-popup>
+            Open Genesys in window
+          </button>
+          <span class="reports-genesys-hint">Keeps this page open with the back link above.</span>
+        </div>
+        <iframe
+          class="reports-embed-frame"
+          data-lazy-src="{{ genesys_analytics_url }}"
+          title="Genesys Analytics Workspace"
+          loading="lazy"
+        ></iframe>
+      </div>
+
+      <div
+        id="panel-custom"
+        class="reports-tab-panel"
+        role="tabpanel"
+        aria-labelledby="tab-custom"
+        data-report-panel="custom"
+      >
+        <div class="reports-embed-header">
+          <h2>AHT component trend</h2>
+          <span class="hint">Biweekly inbound voice · 4-week handle / talk / hold / ACW</span>
+        </div>
+        <iframe
+          class="reports-embed-frame"
+          src="{{ url_for('agent.reports_aht_trend') }}"
+          title="AHT component trend report"
+          loading="lazy"
+        ></iframe>
+      </div>
     </section>
   </main>
   </div>
+
+  <script>
+    window.AWH_REPORTS = {
+      genesysUrl: {{ genesys_analytics_url | tojson }},
+      defaultTab: "custom"
+    };
+  </script>
+  <script src="{{ url_for('static', filename='agent_workspace/reports.js') }}?v=1"></script>
 </body>
 </html>

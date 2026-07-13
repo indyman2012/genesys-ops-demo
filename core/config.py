@@ -52,7 +52,10 @@ def load_client_env(env_path: Path | None = None) -> Path:
 
 
 def normalize_region(raw: str | None = None) -> str:
-    load_client_env()
+    try:
+        load_client_env()
+    except FileNotFoundError:
+        pass
     value = (raw or env_first(
         "GENESYS_REGION",
         "PURECLOUD_REGION",
@@ -92,6 +95,20 @@ def get_login_host(region: str | None = None) -> str:
     if domain == "mypurecloud.com":
         return "https://login.mypurecloud.com"
     return f"https://login.{domain}"
+
+
+def get_apps_host(region: str | None = None) -> str:
+    explicit = env_first("GENESYS_APPS_BASE", "PURECLOUD_APPS_BASE")
+    if explicit:
+        return explicit.rstrip("/")
+    domain = region_domain(region)
+    if domain == "mypurecloud.com":
+        return "https://apps.mypurecloud.com"
+    return f"https://apps.{domain}"
+
+
+def genesys_analytics_dashboards_url(region: str | None = None) -> str:
+    return f"{get_apps_host(region)}/directory/#/analytics/dashboards"
 
 
 def get_client_credentials() -> tuple[str, str]:
