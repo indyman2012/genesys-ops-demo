@@ -196,20 +196,24 @@ body.agent-page .app-shell {
 }
 
 .role-nav-link {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   text-decoration: none;
-  color: var(--aw-muted);
-  padding: 0.15rem 0;
-  border-bottom: 1px solid transparent;
+  color: var(--aw-white);
+  background: var(--aw-orange);
+  border: 1px solid var(--aw-orange);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
 .role-nav-link:hover,
 .role-nav-link:focus {
   color: var(--aw-navy);
-  border-bottom-color: var(--aw-orange);
+  background: var(--aw-yellow);
+  border-color: var(--aw-yellow);
 }
 
 .back-link {

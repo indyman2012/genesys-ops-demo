@@ -70,8 +70,10 @@ class AgentWorkspaceDemo:
         self.on_queue = False
         self.selected_queue_id = DEMO_QUEUES[0]["id"]
         self.media = {
-            "mic": "Default — Headset Microphone",
-            "speaker": "Default — Headset Earphone",
+            "mic": "System default audio",
+            "mic_id": "default",
+            "speaker": "System default audio",
+            "speaker_id": "default",
             "webrtc_ready": True,
         }
         self.current_call: dict[str, Any] | None = None
@@ -203,7 +205,7 @@ class AgentWorkspaceDemo:
             "dial_requires_on_queue": False,
             "nav": {
                 "supervisor": True,
-                "admin": False,
+                "admin": True,
             },
             "updated_at": _utc_now().isoformat(),
         }
@@ -214,6 +216,21 @@ class AgentWorkspaceDemo:
 
     def toggle_queue(self, on_queue: bool) -> None:
         self.on_queue = on_queue
+
+    def set_media(
+        self,
+        *,
+        mic_id: str | None = None,
+        mic_label: str | None = None,
+        speaker_id: str | None = None,
+        speaker_label: str | None = None,
+    ) -> None:
+        if mic_label is not None:
+            self.media["mic"] = mic_label
+            self.media["mic_id"] = mic_id or "default"
+        if speaker_label is not None:
+            self.media["speaker"] = speaker_label
+            self.media["speaker_id"] = speaker_id or "default"
 
     def post_chat(self, queue_id: str, author: str, text: str) -> dict[str, Any]:
         message = {

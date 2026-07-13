@@ -4,6 +4,7 @@
 
   let state = null;
   let queueSelectDirty = false;
+  let listeningCallId = null;
 
   const $ = (id) => document.getElementById(id);
 
@@ -52,12 +53,14 @@
     const nav = state.nav || {};
     const roleNav = $("role-nav");
     const demoNav = window.AGENT_DEMO_MODE === true || window.AGENT_DEMO_MODE === "true";
+    const showSupervisor = demoNav || !!nav.supervisor;
+    const showAdmin = demoNav || !!nav.admin;
     if (roleNav) {
-      const showSupervisor = demoNav || !!nav.supervisor;
-      const showAdmin = demoNav || !!nav.admin;
       roleNav.classList.toggle("hidden", !showSupervisor && !showAdmin);
       const supervisorLink = $("nav-supervisor");
       if (supervisorLink) supervisorLink.classList.toggle("hidden", !showSupervisor);
+      const adminLink = $("nav-admin");
+      if (adminLink) adminLink.classList.toggle("hidden", !showAdmin);
     }
 
     const select = $("queue-select");
@@ -82,10 +85,10 @@
     $("btn-on-queue").disabled = onQueue;
     $("btn-off-queue").disabled = !onQueue;
 
-    $("media-mic").textContent = state.media.mic;
-    $("media-speaker").textContent = state.media.speaker;
-    $("webrtc-status").textContent = state.media.webrtc_ready ? "WebRTC ready" : "WebRTC not ready";
-    $("webrtc-status").className = state.media.webrtc_ready ? "webrtc-ok" : "hint warn";
+    if ($("webrtc-status") && state.media) {
+      $("webrtc-status").textContent = state.media.webrtc_ready ? "WebRTC ready" : "WebRTC not ready";
+      $("webrtc-status").className = state.media.webrtc_ready ? "webrtc-ok" : "hint warn";
+    }
 
     const canDial = !state.current_call;
     $("btn-dial").disabled = !canDial;
@@ -110,8 +113,23 @@
       waiting.forEach((item, index) => {
         const li = document.createElement("li");
         li.className = "waiting-item" + (index === 0 ? " leading" : "");
+        if (listeningCallId && item.id === listeningCallId) {
+          li.classList.add("is-monitored");
+        }
         const waitLabel = formatWait(item.wait_sec);
         const longWait = (item.wait_sec || 0) >= 120;
+        const listening = listeningCallId && item.id === listeningCallId;
+        const listenBtn = showSupervisor
+          ? '<button type="button" class="btn btn-secondary btn-listen' +
+            (listening ? " is-listening" : "") +
+            '" data-listen-call="1" data-call-id="' +
+            escapeHtml(item.id) +
+            '"' +
+            (listening ? " disabled" : "") +
+            ">" +
+            (listening ? "Listening…" : "Listen") +
+            "</button>"
+          : "";
         li.innerHTML =
           '<div class="waiting-caller">' +
           (item.is_callback ? '<span class="waiting-badge">Callback</span>' : "") +
@@ -120,16 +138,19 @@
           '<div class="waiting-number">' +
           escapeHtml(item.caller_number) +
           "</div>" +
-          '<span class="waiting-wait' +
+          '<div class="waiting-side"><span class="waiting-wait' +
           (longWait ? " long" : "") +
           '">' +
           waitLabel +
-          "</span>";
+          "</span>" +
+          listenBtn +
+          "</div>";
         list.appendChild(li);
       });
     }
 
     if (call) {
+      listeningCallId = null;
       $("call-direction").textContent = call.direction;
       $("call-queue").textContent = call.queue_name || "";
       $("call-caller").textContent = call.caller_name || "Unknown";
@@ -279,6 +300,231 @@
     return div.innerHTML;
   }
 
+  const MEDIA_STORAGE_KEY = "archwell_agent_media_v1";
+  const DEFAULT_DEVICE = { deviceId: "default", label: "System default audio" };
+  const DEMO_FALLBACK = {
+    audioinput: [
+      DEFAULT_DEVICE,
+      { deviceId: "builtin-mic", label: "Built-in Microphone" },
+      { deviceId: "headset-mic", label: "Headset Microphone" },
+    ],
+    audiooutput: [
+      DEFAULT_DEVICE,
+      { deviceId: "builtin-speaker", label: "Built-in Speakers" },
+      { deviceId: "headset-speaker", label: "Headset Earphone" },
+    ],
+  };
+
+  let knownDeviceIds = new Set();
+  let pendingDevicePrompt = null;
+  let mediaPrefs = loadMediaPrefs();
+  let mediaInitialized = false;
+
+  function loadMediaPrefs() {
+    try {
+      const raw = localStorage.getItem(MEDIA_STORAGE_KEY);
+      if (!raw) {
+        return { micId: "default", speakerId: "default" };
+      }
+      const parsed = JSON.parse(raw);
+      return {
+        micId: parsed.micId || "default",
+        speakerId: parsed.speakerId || "default",
+      };
+    } catch (_) {
+      return { micId: "default", speakerId: "default" };
+    }
+  }
+
+  function saveMediaPrefs() {
+    localStorage.setItem(MEDIA_STORAGE_KEY, JSON.stringify(mediaPrefs));
+  }
+
+  function deviceLabel(device) {
+    if (!device || device.deviceId === "default") return "System default audio";
+    return device.label || "Audio device";
+  }
+
+  async function listAudioDevices() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      return { ...DEMO_FALLBACK };
+    }
+    try {
+      if (navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (_) {
+          /* labels may stay empty without permission */
+        }
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const grouped = { audioinput: [], audiooutput: [] };
+      devices.forEach((device) => {
+        if (device.kind !== "audioinput" && device.kind !== "audiooutput") return;
+        const label = device.label || (device.deviceId === "default" ? "System default audio" : "Audio device");
+        grouped[device.kind].push({ deviceId: device.deviceId, label });
+      });
+      ["audioinput", "audiooutput"].forEach((kind) => {
+        if (!grouped[kind].some((item) => item.deviceId === "default")) {
+          grouped[kind].unshift(DEFAULT_DEVICE);
+        }
+        if (grouped[kind].length === 0) {
+          grouped[kind] = DEMO_FALLBACK[kind].slice();
+        }
+      });
+      return grouped;
+    } catch (_) {
+      return { ...DEMO_FALLBACK };
+    }
+  }
+
+  function populateMediaSelect(selectEl, kind, devices, selectedId) {
+    if (!selectEl) return;
+    const available = devices[kind] || [];
+    const hasSelected = available.some((device) => device.deviceId === selectedId);
+    const value = hasSelected ? selectedId : "default";
+    if (!hasSelected && selectedId !== "default") {
+      if (kind === "audioinput") mediaPrefs.micId = "default";
+      if (kind === "audiooutput") mediaPrefs.speakerId = "default";
+      saveMediaPrefs();
+    }
+    selectEl.innerHTML = "";
+    available.forEach((device) => {
+      const opt = document.createElement("option");
+      opt.value = device.deviceId;
+      opt.textContent = deviceLabel(device);
+      selectEl.appendChild(opt);
+    });
+    selectEl.value = value;
+    return { value, label: deviceLabel(available.find((d) => d.deviceId === value) || DEFAULT_DEVICE) };
+  }
+
+  async function refreshMediaSelect(kind) {
+    const selectEl = kind === "audioinput" ? $("media-mic-select") : $("media-speaker-select");
+    if (!selectEl) return;
+    const devices = await listAudioDevices();
+    trackKnownDevices(devices);
+    const selectedId = kind === "audioinput" ? mediaPrefs.micId : mediaPrefs.speakerId;
+    const applied = populateMediaSelect(selectEl, kind, devices, selectedId);
+    syncMediaToServer(kind, applied.value, applied.label);
+    return devices;
+  }
+
+  function syncMediaToServer(kind, deviceId, label) {
+    const body =
+      kind === "audioinput"
+        ? { mic_id: deviceId, mic_label: label }
+        : { speaker_id: deviceId, speaker_label: label };
+    return api("/api/media", { method: "POST", body: JSON.stringify(body) })
+      .then((data) => {
+        state = data;
+      })
+      .catch((err) => console.error("media sync failed", err));
+  }
+
+  function trackKnownDevices(devices) {
+    const ids = new Set();
+    ["audioinput", "audiooutput"].forEach((kind) => {
+      (devices[kind] || []).forEach((device) => {
+        if (device.deviceId && device.deviceId !== "default") ids.add(device.deviceId);
+      });
+    });
+    knownDeviceIds = ids;
+  }
+
+  function findNewDevices(devices) {
+    const fresh = [];
+    ["audioinput", "audiooutput"].forEach((kind) => {
+      (devices[kind] || []).forEach((device) => {
+        if (!device.deviceId || device.deviceId === "default") return;
+        if (!knownDeviceIds.has(device.deviceId)) {
+          fresh.push({ ...device, kind });
+        }
+      });
+    });
+    return fresh;
+  }
+
+  function showDeviceModal(device) {
+    pendingDevicePrompt = device;
+    const modal = $("device-modal");
+    const text = $("device-modal-text");
+    if (!modal || !text) return;
+    text.textContent =
+      'New audio device detected — "' + deviceLabel(device) + '". Would you like to use it?';
+    modal.classList.remove("hidden");
+  }
+
+  function hideDeviceModal() {
+    $("device-modal")?.classList.add("hidden");
+    pendingDevicePrompt = null;
+  }
+
+  async function applyMediaChoice(kind, deviceId) {
+    if (kind === "audioinput") mediaPrefs.micId = deviceId;
+    else mediaPrefs.speakerId = deviceId;
+    saveMediaPrefs();
+    await refreshMediaSelect(kind);
+  }
+
+  async function initMedia() {
+    if (mediaInitialized) return;
+    mediaInitialized = true;
+    const micSelect = $("media-mic-select");
+    const speakerSelect = $("media-speaker-select");
+    if (!micSelect || !speakerSelect) return;
+
+    const devices = await listAudioDevices();
+    trackKnownDevices(devices);
+    populateMediaSelect(micSelect, "audioinput", devices, mediaPrefs.micId);
+    populateMediaSelect(speakerSelect, "audiooutput", devices, mediaPrefs.speakerId);
+
+    micSelect.addEventListener("focus", () => {
+      refreshMediaSelect("audioinput");
+    });
+    speakerSelect.addEventListener("focus", () => {
+      refreshMediaSelect("audiooutput");
+    });
+    micSelect.addEventListener("change", () => {
+      mediaPrefs.micId = micSelect.value;
+      saveMediaPrefs();
+      const label = micSelect.options[micSelect.selectedIndex]?.textContent || "System default audio";
+      syncMediaToServer("audioinput", micSelect.value, label);
+    });
+    speakerSelect.addEventListener("change", () => {
+      mediaPrefs.speakerId = speakerSelect.value;
+      saveMediaPrefs();
+      const label =
+        speakerSelect.options[speakerSelect.selectedIndex]?.textContent || "System default audio";
+      syncMediaToServer("audiooutput", speakerSelect.value, label);
+    });
+
+    $("device-modal-yes")?.addEventListener("click", async () => {
+      if (!pendingDevicePrompt) return hideDeviceModal();
+      const device = pendingDevicePrompt;
+      hideDeviceModal();
+      await applyMediaChoice(device.kind, device.deviceId);
+    });
+    $("device-modal-no")?.addEventListener("click", () => {
+      if (pendingDevicePrompt) knownDeviceIds.add(pendingDevicePrompt.deviceId);
+      hideDeviceModal();
+    });
+
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener("devicechange", async () => {
+        const updated = await listAudioDevices();
+        const newcomers = findNewDevices(updated);
+        trackKnownDevices(updated);
+        await refreshMediaSelect("audioinput");
+        await refreshMediaSelect("audiooutput");
+        if (newcomers.length > 0 && $("device-modal")?.classList.contains("hidden")) {
+          showDeviceModal(newcomers[0]);
+        }
+      });
+    }
+  }
+
   function refresh(jitter) {
     const qs = jitter === false ? "?jitter=0" : "";
     return api("/api/state" + qs)
@@ -365,7 +611,20 @@
     post("/api/stats/refresh", {}).catch(alert);
   });
 
-  refresh().then(() => fitCallDisplay());
+  const waitingList = $("waiting-list");
+  if (waitingList) {
+    waitingList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-listen-call]");
+      if (!button || button.disabled) return;
+      listeningCallId = button.getAttribute("data-call-id");
+      if (state) render(state);
+    });
+  }
+
+  refresh().then(() => {
+    initMedia();
+    fitCallDisplay();
+  });
   setInterval(() => refresh(), POLL_REALTIME_MS);
   setInterval(() => post("/api/stats/refresh", {}), POLL_STATS_MS);
 })();

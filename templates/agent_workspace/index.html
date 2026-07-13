@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=9">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=11">
 </head>
 <body class="agent-page{% if demo_mode %} demo-mode{% endif %}">
   <div class="app-shell">
@@ -39,6 +39,7 @@
     <div class="topbar-right">
       <nav id="role-nav" class="role-nav{% if not demo_mode %} hidden{% endif %}">
         <a id="nav-supervisor" class="role-nav-link" href="{{ url_for('agent.reports') }}">Supervisor</a>
+        <a id="nav-admin" class="role-nav-link" href="/">Admin</a>
       </nav>
       <span id="agent-name" class="agent-name"></span>
       <span id="updated-at" class="muted small"></span>
@@ -72,15 +73,15 @@
 
       <section class="card">
         <h2>Media</h2>
-        <p class="hint">Read-only in demo · device picker in production.</p>
-        <div class="media-row">
+        <p class="hint">Devices refresh when opened — plug in a headset anytime.</p>
+        <label class="media-field" for="media-mic-select">
           <span class="label">Microphone</span>
-          <span id="media-mic" class="value"></span>
-        </div>
-        <div class="media-row">
+          <select id="media-mic-select" aria-label="Microphone"></select>
+        </label>
+        <label class="media-field" for="media-speaker-select">
           <span class="label">Speaker</span>
-          <span id="media-speaker" class="value"></span>
-        </div>
+          <select id="media-speaker-select" aria-label="Speaker"></select>
+        </label>
         <p id="webrtc-status" class="webrtc-ok">WebRTC ready</p>
       </section>
 
@@ -183,9 +184,19 @@
   </div>
   </div>
 
+  <div id="device-modal" class="device-modal hidden" role="dialog" aria-modal="true" aria-labelledby="device-modal-text">
+    <div class="device-modal-card">
+      <p id="device-modal-text"></p>
+      <div class="device-modal-actions">
+        <button type="button" id="device-modal-yes" class="btn btn-primary">Yes</button>
+        <button type="button" id="device-modal-no" class="btn btn-secondary">No</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=8"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=10"></script>
 </body>
 </html>

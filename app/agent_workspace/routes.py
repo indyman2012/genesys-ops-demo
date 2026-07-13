@@ -123,6 +123,18 @@ def api_end_call():
     return jsonify(demo_state.snapshot(jitter=False))
 
 
+@agent_bp.route("/api/media", methods=["POST"])
+def api_set_media():
+    payload = request.get_json(silent=True) or {}
+    demo_state.set_media(
+        mic_id=payload.get("mic_id"),
+        mic_label=payload.get("mic_label"),
+        speaker_id=payload.get("speaker_id"),
+        speaker_label=payload.get("speaker_label"),
+    )
+    return jsonify(demo_state.snapshot(jitter=False))
+
+
 @agent_bp.route("/api/stats/refresh", methods=["POST"])
 def api_refresh_stats():
     demo_state.refresh_stats()
