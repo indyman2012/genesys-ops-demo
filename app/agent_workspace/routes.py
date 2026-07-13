@@ -10,6 +10,7 @@ from app.agent_workspace.demo_state import demo_state
 from app.agent_workspace.oauth import (
     OAuthConfigError,
     OAuthExchangeError,
+    agent_oauth_settings,
     authorize_url,
     clear_session,
     exchange_code_for_tokens,
@@ -17,8 +18,9 @@ from app.agent_workspace.oauth import (
     generate_pkce,
     generate_state,
     persist_session,
+    use_pkce,
 )
-from core.config import genesys_analytics_dashboards_url
+from core.config import env_first, genesys_analytics_dashboards_url, get_login_host
 from core.paths import PROJECT_ROOT
 
 agent_bp = Blueprint("agent", __name__, url_prefix="/agent")
@@ -158,9 +160,14 @@ def oauth_login():
         )
 
     try:
-        verifier, challenge = generate_pkce()
+        verifier: str | None = None
+        challenge: str | None = None
+        if use_pkce():
+            verifier, challenge = generate_pkce()
+            session["oauth_pkce_verifier"] = verifier
+        else:
+            session.pop("oauth_pkce_verifier", None)
         oauth_state = generate_state()
-        session["oauth_pkce_verifier"] = verifier
         session["oauth_state"] = oauth_state
         return redirect(authorize_url(state=oauth_state, code_challenge=challenge))
     except OAuthConfigError as exc:
@@ -216,7 +223,7 @@ def oauth_callback():
         )
 
     verifier = session.get("oauth_pkce_verifier")
-    if not verifier:
+    if use_pkce() and not verifier:
         return (
             render_template(
                 "agent_workspace/oauth_error.html",
@@ -227,7 +234,10 @@ def oauth_callback():
         )
 
     try:
-        tokens = exchange_code_for_tokens(code=code, code_verifier=verifier)
+        tokens = exchange_code_for_tokens(
+            code=code,
+            code_verifier=verifier or "",
+        )
         user = fetch_current_user(tokens.access_token)
         persist_session(session, tokens=tokens, user=user)
         return render_template(
@@ -243,6 +253,32 @@ def oauth_callback():
             ),
             500,
         )
+
+
+@agent_bp.route("/oauth/config")
+def oauth_config():
+    """Read-only OAuth wiring check (no secrets) for pilot troubleshooting."""
+    from flask import current_app
+
+    if current_app.config.get("DEMO_MODE"):
+        return jsonify({"demo_mode": True, "message": "Demo mode — OAuth not used."})
+    try:
+        settings = agent_oauth_settings()
+        return jsonify({
+            "login_host": get_login_host(),
+            "redirect_uri": settings.redirect_uri,
+            "client_id": settings.client_id,
+            "pkce": use_pkce(),
+            "checklist": [
+                "Genesys Admin → Integrations → OAuth → open this client_id",
+                "Grant type: Authorization Code (CODE)",
+                "Registered redirect URI must match redirect_uri exactly (https, path, no typos)",
+                "Client state: Active",
+                "Org region: usw2 (login.usw2.pure.cloud)",
+            ],
+        })
+    except OAuthConfigError as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 @agent_bp.route("/oauth/logout", methods=["GET", "POST"])

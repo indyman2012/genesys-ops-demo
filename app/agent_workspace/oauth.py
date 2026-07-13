@@ -78,16 +78,24 @@ def generate_state() -> str:
     return secrets.token_urlsafe(32)
 
 
-def authorize_url(*, state: str, code_challenge: str) -> str:
+def use_pkce() -> bool:
+    value = (env_first("GENESYS_AGENT_USE_PKCE", default="1") or "1").strip().lower()
+    return value not in ("0", "false", "no", "off")
+
+
+def authorize_url(*, state: str, code_challenge: str | None = None) -> str:
     settings = agent_oauth_settings()
     params = {
         "response_type": "code",
         "client_id": settings.client_id,
         "redirect_uri": settings.redirect_uri,
         "state": state,
-        "code_challenge": code_challenge,
-        "code_challenge_method": "S256",
     }
+    if use_pkce():
+        if not code_challenge:
+            raise OAuthConfigError("PKCE enabled but code_challenge missing")
+        params["code_challenge"] = code_challenge
+        params["code_challenge_method"] = "S256"
     return f"{get_login_host()}/oauth/authorize?{urlencode(params)}"
 
 
@@ -97,18 +105,20 @@ def exchange_code_for_tokens(*, code: str, code_verifier: str) -> OAuthTokens:
     basic = base64.b64encode(
         f"{settings.client_id}:{settings.client_secret}".encode("ascii")
     ).decode("ascii")
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": settings.redirect_uri,
+    }
+    if use_pkce():
+        data["code_verifier"] = code_verifier
     response = requests.post(
         f"{login_host}/oauth/token",
         headers={
             "Authorization": f"Basic {basic}",
             "Content-Type": "application/x-www-form-urlencoded",
         },
-        data={
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": settings.redirect_uri,
-            "code_verifier": code_verifier,
-        },
+        data=data,
         timeout=60,
     )
     if response.status_code >= 400:
