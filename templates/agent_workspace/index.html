@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=2">
-  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=11">
+  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=12">
 </head>
 <body class="agent-page{% if demo_mode %} demo-mode{% endif %}">
   <div class="app-shell">
@@ -48,7 +48,16 @@
 
   <div id="viewport-scale" class="viewport-scale">
     <div id="viewport-scale-inner" class="viewport-scale-inner">
-  <main class="workspace">
+  <section id="auth-gate" class="auth-gate hidden" aria-labelledby="auth-gate-title">
+    <div class="card auth-gate-card">
+      <h2 id="auth-gate-title">Sign in to Genesys Cloud</h2>
+      <p class="auth-gate-copy">
+        Use your ArchWell credentials to open the agent workspace. Queue and call data load only after sign-in.
+      </p>
+      <a id="btn-sign-in" class="btn btn-primary" href="{{ url_for('agent.oauth_login') }}">Sign in</a>
+    </div>
+  </section>
+  <main id="agent-workspace" class="workspace">
     <aside class="panel panel-left">
       <section class="card">
         <h2>Queue status</h2>
@@ -85,10 +94,12 @@
         <p id="webrtc-status" class="webrtc-ok">WebRTC ready</p>
       </section>
 
+      {% if demo_mode %}
       <section class="card demo-tools">
         <h2>Demo controls</h2>
         <button type="button" id="btn-sim-inbound" class="btn btn-secondary">Simulate inbound ring</button>
       </section>
+      {% endif %}
     </aside>
 
     <section class="panel panel-center">
@@ -197,6 +208,6 @@
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=12"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=13"></script>
 </body>
 </html>

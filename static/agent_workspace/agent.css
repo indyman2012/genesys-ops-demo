@@ -1,5 +1,32 @@
 /* Agent workspace layout — requires static/archwell/shell.css */
 
+.auth-gate {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.auth-gate-card {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.auth-gate-card h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-heading);
+  color: var(--aw-navy);
+}
+
+.auth-gate-copy {
+  margin: 0 0 1.25rem;
+  color: var(--aw-muted);
+  line-height: 1.5;
+}
+
 .hint.realtime { margin-top: -0.35rem; margin-bottom: 0.75rem; }
 
 .queue-field {

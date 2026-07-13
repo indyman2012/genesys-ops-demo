@@ -46,24 +46,42 @@
     }[status] || status;
   }
 
-  function render(state) {
+  function needsAuth(state) {
     const pilotMode = window.AGENT_DEMO_MODE !== true && window.AGENT_DEMO_MODE !== "true";
-    const needsAuth = pilotMode && !state.authenticated;
+    return pilotMode && (!!state.auth_required || !state.authenticated);
+  }
 
-    $("agent-name").textContent = needsAuth ? "Sign in required" : state.agent_name;
-    $("updated-at").textContent = "Updated " + formatTime(state.updated_at);
+  function setAuthGate(visible) {
+    const gate = $("auth-gate");
+    const workspace = $("agent-workspace");
+    const footer = document.querySelector(".footer-stats");
+    if (gate) gate.classList.toggle("hidden", !visible);
+    if (workspace) workspace.classList.toggle("hidden", visible);
+    if (footer) footer.classList.toggle("hidden", visible);
+  }
+
+  function render(state) {
+    const authBlocked = needsAuth(state);
+
+    $("agent-name").textContent = authBlocked ? "Sign in required" : state.agent_name;
+    $("updated-at").textContent = authBlocked ? "" : "Updated " + formatTime(state.updated_at);
 
     const nav = state.nav || {};
     const roleNav = $("role-nav");
     const demoNav = window.AGENT_DEMO_MODE === true || window.AGENT_DEMO_MODE === "true";
-    const showSupervisor = !needsAuth && (demoNav || !!nav.supervisor);
-    const showAdmin = !needsAuth && (demoNav || !!nav.admin);
+    const showSupervisor = !authBlocked && (demoNav || !!nav.supervisor);
+    const showAdmin = !authBlocked && (demoNav || !!nav.admin);
     if (roleNav) {
       roleNav.classList.toggle("hidden", !showSupervisor && !showAdmin);
       const supervisorLink = $("nav-supervisor");
       if (supervisorLink) supervisorLink.classList.toggle("hidden", !showSupervisor);
       const adminLink = $("nav-admin");
       if (adminLink) adminLink.classList.toggle("hidden", !showAdmin);
+    }
+
+    setAuthGate(authBlocked);
+    if (authBlocked) {
+      return;
     }
 
     const select = $("queue-select");
@@ -567,7 +585,7 @@
     post("/api/call/dial", { phone_number: phone }).catch(alert);
   });
 
-  $("btn-sim-inbound").addEventListener("click", () => {
+  $("btn-sim-inbound")?.addEventListener("click", () => {
     api("/api/call/inbound", { method: "POST", body: "{}" })
       .then((data) => {
         state = data;
@@ -625,9 +643,20 @@
   }
 
   refresh().then(() => {
-    initMedia();
-    fitCallDisplay();
+    if (!state || !needsAuth(state)) {
+      initMedia();
+      fitCallDisplay();
+    }
   });
-  setInterval(() => refresh(), POLL_REALTIME_MS);
-  setInterval(() => post("/api/stats/refresh", {}), POLL_STATS_MS);
+  setInterval(() => {
+    if (state && needsAuth(state)) {
+      refresh(false);
+      return;
+    }
+    refresh();
+  }, POLL_REALTIME_MS);
+  setInterval(() => {
+    if (state && needsAuth(state)) return;
+    post("/api/stats/refresh", {});
+  }, POLL_STATS_MS);
 })();

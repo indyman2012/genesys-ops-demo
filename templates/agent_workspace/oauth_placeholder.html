@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArchWell Health — Sign in</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=12">
+</head>
+<body class="agent-page">
+  <div class="app-shell">
+    <section class="auth-gate">
+      <div class="card auth-gate-card">
+        <h2>Sign in</h2>
+        <p class="auth-gate-copy">{{ message }}</p>
+        <a class="btn btn-primary" href="{{ url_for('agent.index') }}">Back to workspace</a>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
