@@ -109,6 +109,28 @@ If the repo already exists on GitHub, commit and push the new files to your usua
 
 ---
 
+## v1.1 backlog (post-pilot — not in demo)
+
+### Agent: activate / deactivate in queues
+
+Today the demo has a single **Go On Queue / Off Queue** toggle for the selected queue. v1.1 should let agents **join or leave individual queues** they are assigned to — activate/deactivate themselves per queue without leaving the workspace.
+
+- **Genesys API:** `PATCH /api/v2/users/{userId}/queues/{queueId}` with `joined: true/false`
+- **Existing code:** `tools/queues/queue_joined_true.py`, `queue_joined_false.py`
+- **UI:** Queue list with per-queue joined toggle (or multi-select membership panel in left column)
+- **Scope:** Agent can only change **their own** membership, not others
+
+### Supervisor: add / remove agents from a queue
+
+Supervisors need to **add or remove people from the queue entirely** (queue membership, not just joined state).
+
+- **Genesys API:** queue member create/delete — `POST/DELETE /api/v2/routing/queues/{queueId}/members` (or member bulk updates per org conventions)
+- **UI:** Supervisor-only control on queue membership panel (right column) or ops-style modal on selected queue
+- **Role gate:** `nav.supervisor` (and audit logging in production)
+- **Distinct from agent toggle:** supervisor changes **who is on the queue**; agent toggle is **whether I am receiving work** from queues I am already on
+
+---
+
 ## Related docs
 
 - Ops console demo: [README-DEMO.md](README-DEMO.md) (port **8081**)
