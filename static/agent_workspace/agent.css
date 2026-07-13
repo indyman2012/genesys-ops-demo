@@ -219,11 +219,62 @@
 
 .call-card { min-height: 0; }
 
-.call-card .call-waiting,
-.call-card .call-active {
+.call-card .call-active,
+.call-card .queue-calls-panel {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.queue-calls-hint {
+  margin: 0 0 0.65rem;
+  flex-shrink: 0;
+}
+
+.queue-calls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.queue-calls-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.subsection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+  flex-shrink: 0;
+}
+
+.subsection-title {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--aw-navy);
+}
+
+.subsection-count {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--aw-muted);
+}
+
+.queue-calls-empty {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed var(--aw-border);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--aw-muted);
+  text-align: center;
 }
 
 .call-waiting {
@@ -252,19 +303,24 @@
   color: var(--aw-navy);
 }
 
-.waiting-list {
+.waiting-list,
+.active-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
 }
 
-.waiting-item {
+.waiting-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.waiting-item,
+.active-item {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.35rem 0.75rem;
@@ -343,26 +399,41 @@
   cursor: default;
 }
 
-.waiting-item.is-monitored {
+.waiting-item.is-monitored,
+.active-item.is-monitored {
   box-shadow: inset 0 0 0 1px var(--aw-blue-light);
 }
 
-.waiting-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--aw-muted);
-  font-size: 0.9rem;
-  margin: 0;
-  padding: 1rem;
+.active-agent {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--aw-teal);
+  margin-bottom: 0.15rem;
+}
+
+.active-duration {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--aw-navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.your-call-title {
+  margin: 0.85rem 0 0.5rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--aw-border);
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--aw-navy);
+  flex-shrink: 0;
 }
 
 .call-active {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 .call-display {

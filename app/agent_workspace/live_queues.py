@@ -182,6 +182,7 @@ def build_live_snapshot(session: dict[str, Any]) -> dict[str, Any]:
         },
         "current_call": None,
         "calls_waiting": [],
+        "calls_active": [],
         "wrapup_codes": WRAPUP_CODES,
         "membership": [],
         "activity": {

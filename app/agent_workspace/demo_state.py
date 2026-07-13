@@ -119,6 +119,31 @@ class AgentWorkspaceDemo:
             queue["id"]: self._seed_waiting_calls(queue["id"])
             for queue in DEMO_QUEUES
         }
+        self._active_calls_state: dict[str, list[dict[str, Any]]] = {
+            queue["id"]: self._seed_active_calls(queue["id"])
+            for queue in DEMO_QUEUES
+        }
+
+    def _seed_active_calls(self, queue_id: str) -> list[dict[str, Any]]:
+        members = [
+            member["name"]
+            for member in self._member_state[queue_id]
+            if member["status"] == "on_call"
+        ]
+        if not members:
+            members = [name for name, status in MEMBER_SEEDS if status == "on_call"][:2]
+        calls = []
+        for index, agent_name in enumerate(members):
+            caller_name, caller_number = WAITING_CALL_SEEDS[index % len(WAITING_CALL_SEEDS)]
+            calls.append({
+                "id": str(uuid.uuid4()),
+                "agent_name": agent_name,
+                "caller_name": caller_name,
+                "caller_number": caller_number,
+                "duration_sec": random.randint(45, 420) + index * 18,
+                "direction": "inbound",
+            })
+        return calls
 
     def _seed_waiting_calls(self, queue_id: str) -> list[dict[str, Any]]:
         count = 2 + (hash(queue_id) % 4)
@@ -177,6 +202,27 @@ class AgentWorkspaceDemo:
             waiting.sort(key=lambda item: item["wait_sec"], reverse=True)
         if random.random() < 0.12 and waiting:
             waiting.pop(random.randrange(len(waiting)))
+        active = self._active_calls_state[queue_id]
+        for call in active:
+            call["duration_sec"] += random.randint(3, 8)
+        if random.random() < 0.1 and len(active) < 6:
+            on_call_members = [
+                member["name"]
+                for member in self._member_state[queue_id]
+                if member["status"] == "on_call"
+            ]
+            if on_call_members:
+                caller_name, caller_number = random.choice(WAITING_CALL_SEEDS)
+                active.append({
+                    "id": str(uuid.uuid4()),
+                    "agent_name": random.choice(on_call_members),
+                    "caller_name": caller_name,
+                    "caller_number": caller_number,
+                    "duration_sec": random.randint(12, 40),
+                    "direction": "inbound",
+                })
+        if random.random() < 0.08 and active:
+            active.pop(random.randrange(len(active)))
 
     def snapshot(self, *, jitter: bool = True) -> dict[str, Any]:
         queue_id = self.selected_queue_id
@@ -195,6 +241,7 @@ class AgentWorkspaceDemo:
             "media": self.media,
             "current_call": deepcopy(self.current_call),
             "calls_waiting": deepcopy(self._waiting_state[queue_id]),
+            "calls_active": deepcopy(self._active_calls_state[queue_id]),
             "wrapup_codes": WRAPUP_CODES,
             "membership": deepcopy(self._member_state[queue_id]),
             "activity": activity,

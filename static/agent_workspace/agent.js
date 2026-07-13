@@ -37,6 +37,13 @@
     return mins + ":" + String(secs).padStart(2, "0");
   }
 
+  function formatDuration(seconds) {
+    const total = Math.max(0, parseInt(seconds, 10) || 0);
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    return mins + ":" + String(secs).padStart(2, "0");
+  }
+
   function memberLabel(status) {
     return {
       on_queue: "On queue",
@@ -126,61 +133,79 @@
     if (simInbound) simInbound.disabled = !onQueue || !!state.current_call;
 
     const call = state.current_call;
-    const waitingPanel = $("call-waiting");
-    const panelTitle = $("call-panel-title");
-    waitingPanel.classList.toggle("hidden", !!call);
+
+    const waiting = state.calls_waiting || [];
+    $("waiting-count").textContent =
+      waiting.length === 1 ? "1 waiting" : waiting.length + " waiting";
+    const waitingList = $("waiting-list");
+    waitingList.innerHTML = "";
+    $("waiting-empty").classList.toggle("hidden", waiting.length > 0);
+    waitingList.classList.toggle("hidden", waiting.length === 0);
+    waiting.forEach((item, index) => {
+      const li = document.createElement("li");
+      li.className = "waiting-item" + (index === 0 ? " leading" : "");
+      const waitLabel = formatWait(item.wait_sec);
+      const longWait = (item.wait_sec || 0) >= 120;
+      li.innerHTML =
+        '<div class="waiting-caller">' +
+        (item.is_callback ? '<span class="waiting-badge">Callback</span>' : "") +
+        escapeHtml(item.caller_name) +
+        "</div>" +
+        '<div class="waiting-number">' +
+        escapeHtml(item.caller_number) +
+        "</div>" +
+        '<div class="waiting-side"><span class="waiting-wait' +
+        (longWait ? " long" : "") +
+        '">' +
+        waitLabel +
+        "</span></div>";
+      waitingList.appendChild(li);
+    });
+
+    const active = state.calls_active || [];
+    $("active-count").textContent =
+      active.length === 1 ? "1 active" : active.length + " active";
+    const activeList = $("active-list");
+    activeList.innerHTML = "";
+    $("active-empty").classList.toggle("hidden", active.length > 0);
+    activeList.classList.toggle("hidden", active.length === 0);
+    active.forEach((item) => {
+      const li = document.createElement("li");
+      li.className = "active-item";
+      if (listeningCallId && item.id === listeningCallId) {
+        li.classList.add("is-monitored");
+      }
+      const listening = listeningCallId && item.id === listeningCallId;
+      const listenBtn = showSupervisor
+        ? '<button type="button" class="btn btn-secondary btn-listen' +
+          (listening ? " is-listening" : "") +
+          '" data-listen-call="1" data-call-id="' +
+          escapeHtml(item.id) +
+          '"' +
+          (listening ? " disabled" : "") +
+          ">" +
+          (listening ? "Listening…" : "Listen") +
+          "</button>"
+        : "";
+      li.innerHTML =
+        '<div><div class="active-agent">' +
+        escapeHtml(item.agent_name || "Agent") +
+        '</div><div class="waiting-caller">' +
+        escapeHtml(item.caller_name) +
+        "</div>" +
+        '<div class="waiting-number">' +
+        escapeHtml(item.caller_number) +
+        "</div></div>" +
+        '<div class="waiting-side"><span class="active-duration">' +
+        formatDuration(item.duration_sec) +
+        "</span>" +
+        listenBtn +
+        "</div>";
+      activeList.appendChild(li);
+    });
+
     $("call-active").classList.toggle("hidden", !call);
-    panelTitle.textContent = call ? "Current interaction" : "Calls waiting";
-
-    if (!call) {
-      const waiting = state.calls_waiting || [];
-      $("waiting-count").textContent =
-        waiting.length === 1 ? "1 call waiting" : waiting.length + " calls waiting";
-      const list = $("waiting-list");
-      list.innerHTML = "";
-      $("waiting-empty").classList.toggle("hidden", waiting.length > 0);
-      list.classList.toggle("hidden", waiting.length === 0);
-      waiting.forEach((item, index) => {
-        const li = document.createElement("li");
-        li.className = "waiting-item" + (index === 0 ? " leading" : "");
-        if (listeningCallId && item.id === listeningCallId) {
-          li.classList.add("is-monitored");
-        }
-        const waitLabel = formatWait(item.wait_sec);
-        const longWait = (item.wait_sec || 0) >= 120;
-        const listening = listeningCallId && item.id === listeningCallId;
-        const listenBtn = showSupervisor
-          ? '<button type="button" class="btn btn-secondary btn-listen' +
-            (listening ? " is-listening" : "") +
-            '" data-listen-call="1" data-call-id="' +
-            escapeHtml(item.id) +
-            '"' +
-            (listening ? " disabled" : "") +
-            ">" +
-            (listening ? "Listening…" : "Listen") +
-            "</button>"
-          : "";
-        li.innerHTML =
-          '<div class="waiting-caller">' +
-          (item.is_callback ? '<span class="waiting-badge">Callback</span>' : "") +
-          escapeHtml(item.caller_name) +
-          "</div>" +
-          '<div class="waiting-number">' +
-          escapeHtml(item.caller_number) +
-          "</div>" +
-          '<div class="waiting-side"><span class="waiting-wait' +
-          (longWait ? " long" : "") +
-          '">' +
-          waitLabel +
-          "</span>" +
-          listenBtn +
-          "</div>";
-        list.appendChild(li);
-      });
-    }
-
     if (call) {
-      listeningCallId = null;
       $("call-direction").textContent = call.direction;
       $("call-queue").textContent = call.queue_name || "";
       $("call-caller").textContent = call.caller_name || "Unknown";
@@ -268,11 +293,8 @@
       const title = card.querySelector("h2");
       const titleHeight = title ? title.offsetHeight + 12 : 0;
 
-      if ($("call-waiting") && !$("call-waiting").classList.contains("hidden")) {
-        return;
-      }
-
-      if (!display || $("call-active").classList.contains("hidden")) return;
+      if ($("call-active").classList.contains("hidden")) return;
+      if (!display) return;
 
       ["call-caller", "call-number", "call-on-behalf"].forEach((id) => {
         const el = $(id);
@@ -641,9 +663,9 @@
     post("/api/stats/refresh", {}).catch(alert);
   });
 
-  const waitingList = $("waiting-list");
-  if (waitingList) {
-    waitingList.addEventListener("click", (event) => {
+  const activeList = $("active-list");
+  if (activeList) {
+    activeList.addEventListener("click", (event) => {
       const button = event.target.closest("[data-listen-call]");
       if (!button || button.disabled) return;
       listeningCallId = button.getAttribute("data-call-id");

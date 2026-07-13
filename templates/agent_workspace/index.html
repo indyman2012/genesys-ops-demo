@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=2">
-  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=12">
+  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=13">
 </head>
 <body class="agent-page{% if demo_mode %} demo-mode{% endif %}">
   <div class="app-shell">
@@ -105,16 +105,28 @@
 
     <section class="panel panel-center">
       <div class="card call-card">
-        <h2 id="call-panel-title">Calls waiting</h2>
-        <div id="call-waiting" class="call-waiting">
-          <div class="waiting-header">
-            <span id="waiting-count" class="waiting-count">0 waiting</span>
-            <span class="hint realtime">Real-time · selected queue</span>
-          </div>
-          <ul id="waiting-list" class="waiting-list"></ul>
-          <p id="waiting-empty" class="waiting-empty hidden">No calls waiting in this queue.</p>
+        <h2 id="call-panel-title">Queue calls</h2>
+        <p class="hint realtime queue-calls-hint">Real-time · selected queue</p>
+        <div id="queue-calls-panel" class="queue-calls-panel">
+          <section class="queue-calls-section">
+            <div class="subsection-header">
+              <span class="subsection-title">Waiting</span>
+              <span id="waiting-count" class="subsection-count">0 waiting</span>
+            </div>
+            <ul id="waiting-list" class="waiting-list"></ul>
+            <p id="waiting-empty" class="queue-calls-empty hidden">No calls waiting in this queue.</p>
+          </section>
+          <section class="queue-calls-section">
+            <div class="subsection-header">
+              <span class="subsection-title">Active</span>
+              <span id="active-count" class="subsection-count">0 active</span>
+            </div>
+            <ul id="active-list" class="active-list"></ul>
+            <p id="active-empty" class="queue-calls-empty hidden">No active calls in this queue.</p>
+          </section>
         </div>
         <div id="call-active" class="call-active hidden">
+          <h3 class="your-call-title">Your interaction</h3>
           <div class="call-display">
             <div class="call-meta">
               <span id="call-direction" class="badge direction"></span>
@@ -209,6 +221,6 @@
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=16"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=17"></script>
 </body>
 </html>

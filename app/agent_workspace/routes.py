@@ -59,6 +59,7 @@ def _unauthenticated_snapshot() -> dict:
         },
         "current_call": None,
         "calls_waiting": [],
+        "calls_active": [],
         "wrapup_codes": [],
         "membership": [],
         "activity": {
