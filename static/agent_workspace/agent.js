@@ -47,14 +47,17 @@
   }
 
   function render(state) {
-    $("agent-name").textContent = state.agent_name;
+    const pilotMode = window.AGENT_DEMO_MODE !== true && window.AGENT_DEMO_MODE !== "true";
+    const needsAuth = pilotMode && !state.authenticated;
+
+    $("agent-name").textContent = needsAuth ? "Sign in required" : state.agent_name;
     $("updated-at").textContent = "Updated " + formatTime(state.updated_at);
 
     const nav = state.nav || {};
     const roleNav = $("role-nav");
     const demoNav = window.AGENT_DEMO_MODE === true || window.AGENT_DEMO_MODE === "true";
-    const showSupervisor = demoNav || !!nav.supervisor;
-    const showAdmin = demoNav || !!nav.admin;
+    const showSupervisor = !needsAuth && (demoNav || !!nav.supervisor);
+    const showAdmin = !needsAuth && (demoNav || !!nav.admin);
     if (roleNav) {
       roleNav.classList.toggle("hidden", !showSupervisor && !showAdmin);
       const supervisorLink = $("nav-supervisor");
