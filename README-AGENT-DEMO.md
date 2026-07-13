@@ -129,9 +129,19 @@ Supervisors need to **add or remove people from the queue entirely** (queue memb
 - **Role gate:** `nav.supervisor` (and audit logging in production)
 - **Distinct from agent toggle:** supervisor changes **who is on the queue**; agent toggle is **whether I am receiving work** from queues I am already on
 
+### Ops console: Agent Workspace back link
+
+The supervisor reports page keeps **← Agent workspace** in the top bar (`templates/agent_workspace/reports.html`). The ops console should mirror that — an **Agent Workspace** link in the ops header so admins can return to `/agent/` without using the browser back button.
+
+- **UI:** Orange pill link in `topbar-left` (same `role-nav-link` / `back-link` classes as reports), e.g. `← Agent workspace` → `url_for('agent.index')`
+- **Files:** `templates/ops/index.html` (and `not_responding.html` if it shares the ops shell)
+- **Symmetry:** Agent workspace already has **Admin** → `/`; ops gets the reverse link back to `/agent/`
+
 ---
 
 ## Related docs
 
+- **Pilot plan (approved):** [docs/agent_workspace_pilot.md](docs/agent_workspace_pilot.md)
 - Ops console demo: [README-DEMO.md](README-DEMO.md) (port **8081**)
 - Ops production entry: `ops_app.py` (port **8080**)
+- Agent production entry: `agent_app.py` (port **8083** — pilot scaffold)
