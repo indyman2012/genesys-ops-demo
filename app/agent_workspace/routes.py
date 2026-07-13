@@ -12,6 +12,20 @@ from core.paths import PROJECT_ROOT
 agent_bp = Blueprint("agent", __name__, url_prefix="/agent")
 
 
+def _public_snapshot(*, jitter: bool = True) -> dict:
+    """Return API state; in pilot mode mask demo placeholders until OAuth is wired."""
+    from flask import current_app
+
+    snap = demo_state.snapshot(jitter=jitter)
+    if current_app.config.get("DEMO_MODE"):
+        return snap
+    snap["demo_mode"] = False
+    snap["agent_name"] = "Sign in required"
+    snap["nav"] = {"supervisor": False, "admin": False}
+    snap["auth_required"] = True
+    return snap
+
+
 @agent_bp.route("/")
 def index():
     from flask import current_app
@@ -55,7 +69,7 @@ def health():
 
 @agent_bp.route("/api/state")
 def api_state():
-    return jsonify(demo_state.snapshot())
+    return jsonify(_public_snapshot())
 
 
 @agent_bp.route("/api/queue", methods=["POST"])
@@ -65,7 +79,7 @@ def api_set_queue():
     if not queue_id:
         return jsonify({"error": "queue_id required"}), 400
     demo_state.set_queue(queue_id)
-    return jsonify(demo_state.snapshot(jitter=False))
+    return jsonify(_public_snapshot(jitter=False))
 
 
 @agent_bp.route("/api/on-queue", methods=["POST"])
@@ -73,7 +87,7 @@ def api_on_queue():
     payload = request.get_json(silent=True) or {}
     on_queue = bool(payload.get("on_queue"))
     demo_state.toggle_queue(on_queue)
-    return jsonify(demo_state.snapshot(jitter=False))
+    return jsonify(_public_snapshot(jitter=False))
 
 
 @agent_bp.route("/api/chat", methods=["POST"])
@@ -84,7 +98,7 @@ def api_chat():
     if not text:
         return jsonify({"error": "text required"}), 400
     message = demo_state.post_chat(queue_id, demo_state.agent_name, text)
-    return jsonify({"message": message, "state": demo_state.snapshot(jitter=False)})
+    return jsonify({"message": message, "state": _public_snapshot(jitter=False)})
 
 
 @agent_bp.route("/api/call/inbound", methods=["POST"])
@@ -92,7 +106,7 @@ def api_inbound():
     call = demo_state.start_inbound_call()
     if not call:
         return jsonify({"error": "Must be on queue with no active call"}), 400
-    return jsonify(demo_state.snapshot(jitter=False))
+    return jsonify(_public_snapshot(jitter=False))
 
 
 @agent_bp.route("/api/call/answer", methods=["POST"])
@@ -100,7 +114,7 @@ def api_answer():
     call = demo_state.answer_call()
     if not call:
         return jsonify({"error": "No ringing call"}), 400
-    return jsonify(demo_state.snapshot(jitter=False))
+    return jsonify(_public_snapshot(jitter=False))
 
 
 @agent_bp.route("/api/call/dial", methods=["POST"])
@@ -114,7 +128,7 @@ def api_dial():
         if demo_state.current_call:
             return jsonify({"error": "End the current call before dialing"}), 400
         return jsonify({"error": "Select a queue first"}), 400
-    return jsonify(demo_state.snapshot(jitter=False))
+    return jsonify(_public_snapshot(jitter=False))
 
 
 @agent_bp.route("/api/call/end", methods=["POST"])
@@ -122,7 +136,7 @@ def api_end_call():
     payload = request.get_json(silent=True) or {}
     wrapup_code_id = payload.get("wrapup_code_id") or "resolved"
     demo_state.end_call(wrapup_code_id)
-    return jsonify(demo_state.snapshot(jitter=False))
+    return jsonify(_public_snapshot(jitter=False))
 
 
 @agent_bp.route("/api/media", methods=["POST"])
@@ -134,13 +148,13 @@ def api_set_media():
         speaker_id=payload.get("speaker_id"),
         speaker_label=payload.get("speaker_label"),
     )
-    return jsonify(demo_state.snapshot(jitter=False))
+    return jsonify(_public_snapshot(jitter=False))
 
 
 @agent_bp.route("/api/stats/refresh", methods=["POST"])
 def api_refresh_stats():
     demo_state.refresh_stats()
-    return jsonify(demo_state.snapshot(jitter=False))
+    return jsonify(_public_snapshot(jitter=False))
 
 
 def create_app(*, demo_mode: bool = False):
