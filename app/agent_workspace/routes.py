@@ -7,6 +7,12 @@ from flask import Blueprint, Response, jsonify, redirect, render_template, reque
 
 from app.agent_workspace.demo_reports import aht_trend_report_html
 from app.agent_workspace.demo_state import demo_state
+from app.agent_workspace.live_queues import (
+    LiveQueueError,
+    apply_on_queue,
+    apply_queue_selection,
+    build_live_snapshot,
+)
 from app.agent_workspace.oauth import (
     OAuthConfigError,
     OAuthExchangeError,
@@ -77,6 +83,40 @@ def _unauthenticated_snapshot() -> dict:
     }
 
 
+def _is_live_pilot() -> bool:
+    from flask import current_app
+
+    return not current_app.config.get("DEMO_MODE") and _is_authenticated()
+
+
+def _handle_live_error(exc: LiveQueueError):
+    if "expired" in str(exc).lower():
+        clear_session(session)
+        return jsonify(_unauthenticated_snapshot()), 401
+    return jsonify({"error": str(exc)}), 502
+
+
+def _live_snapshot_or_fallback() -> dict:
+    try:
+        return build_live_snapshot(session)
+    except LiveQueueError as exc:
+        if "expired" in str(exc).lower():
+            clear_session(session)
+            return _unauthenticated_snapshot()
+        snap = _unauthenticated_snapshot()
+        snap["authenticated"] = True
+        snap["auth_required"] = False
+        snap["agent_name"] = session.get("genesys_user_name") or "Agent"
+        snap["queues_error"] = str(exc)
+        return snap
+
+
+def _pilot_telephony_blocked():
+    if _is_live_pilot():
+        return jsonify({"error": "Telephony not available until WebRTC phase"}), 501
+    return None
+
+
 def _public_snapshot(*, jitter: bool = True) -> dict:
     """Return API state; pilot mode returns empty shell until OAuth session exists."""
     from flask import current_app
@@ -88,13 +128,7 @@ def _public_snapshot(*, jitter: bool = True) -> dict:
         return snap
     if not _is_authenticated():
         return _unauthenticated_snapshot()
-    snap = demo_state.snapshot(jitter=jitter)
-    snap["demo_mode"] = False
-    snap["authenticated"] = True
-    snap["auth_required"] = False
-    snap["agent_name"] = session.get("genesys_user_name") or "Agent"
-    snap["nav"] = {"supervisor": False, "admin": False}
-    return snap
+    return _live_snapshot_or_fallback()
 
 
 def _require_auth():
@@ -301,6 +335,11 @@ def api_set_queue():
     queue_id = payload.get("queue_id")
     if not queue_id:
         return jsonify({"error": "queue_id required"}), 400
+    if _is_live_pilot():
+        try:
+            return jsonify(apply_queue_selection(session, queue_id=queue_id))
+        except LiveQueueError as exc:
+            return _handle_live_error(exc)
     demo_state.set_queue(queue_id)
     return jsonify(_public_snapshot(jitter=False))
 
@@ -312,6 +351,11 @@ def api_on_queue():
         return blocked
     payload = request.get_json(silent=True) or {}
     on_queue = bool(payload.get("on_queue"))
+    if _is_live_pilot():
+        try:
+            return jsonify(apply_on_queue(session, joined=on_queue))
+        except LiveQueueError as exc:
+            return _handle_live_error(exc)
     demo_state.toggle_queue(on_queue)
     return jsonify(_public_snapshot(jitter=False))
 
@@ -321,6 +365,9 @@ def api_chat():
     blocked = _require_auth()
     if blocked:
         return blocked
+    telephony = _pilot_telephony_blocked()
+    if telephony:
+        return telephony
     payload = request.get_json(silent=True) or {}
     text = (payload.get("text") or "").strip()
     queue_id = payload.get("queue_id") or demo_state.selected_queue_id
@@ -335,6 +382,9 @@ def api_inbound():
     blocked = _require_auth()
     if blocked:
         return blocked
+    telephony = _pilot_telephony_blocked()
+    if telephony:
+        return telephony
     call = demo_state.start_inbound_call()
     if not call:
         return jsonify({"error": "Must be on queue with no active call"}), 400
@@ -346,6 +396,9 @@ def api_answer():
     blocked = _require_auth()
     if blocked:
         return blocked
+    telephony = _pilot_telephony_blocked()
+    if telephony:
+        return telephony
     call = demo_state.answer_call()
     if not call:
         return jsonify({"error": "No ringing call"}), 400
@@ -357,6 +410,9 @@ def api_dial():
     blocked = _require_auth()
     if blocked:
         return blocked
+    telephony = _pilot_telephony_blocked()
+    if telephony:
+        return telephony
     payload = request.get_json(silent=True) or {}
     phone = (payload.get("phone_number") or "").strip()
     if not phone:
@@ -374,6 +430,9 @@ def api_end_call():
     blocked = _require_auth()
     if blocked:
         return blocked
+    telephony = _pilot_telephony_blocked()
+    if telephony:
+        return telephony
     payload = request.get_json(silent=True) or {}
     wrapup_code_id = payload.get("wrapup_code_id") or "resolved"
     demo_state.end_call(wrapup_code_id)
@@ -386,6 +445,16 @@ def api_set_media():
     if blocked:
         return blocked
     payload = request.get_json(silent=True) or {}
+    if _is_live_pilot():
+        if payload.get("mic_id") is not None:
+            session["agent_media_mic_id"] = payload.get("mic_id") or "default"
+        if payload.get("mic_label") is not None:
+            session["agent_media_mic"] = payload.get("mic_label") or "System default audio"
+        if payload.get("speaker_id") is not None:
+            session["agent_media_speaker_id"] = payload.get("speaker_id") or "default"
+        if payload.get("speaker_label") is not None:
+            session["agent_media_speaker"] = payload.get("speaker_label") or "System default audio"
+        return jsonify(_public_snapshot(jitter=False))
     demo_state.set_media(
         mic_id=payload.get("mic_id"),
         mic_label=payload.get("mic_label"),
@@ -400,6 +469,8 @@ def api_refresh_stats():
     blocked = _require_auth()
     if blocked:
         return blocked
+    if _is_live_pilot():
+        return jsonify(_public_snapshot(jitter=False))
     demo_state.refresh_stats()
     return jsonify(_public_snapshot(jitter=False))
 

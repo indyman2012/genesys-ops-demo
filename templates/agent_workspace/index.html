@@ -65,6 +65,7 @@
           <label class="queue-label" for="queue-select">Active queue</label>
           <select id="queue-select" aria-label="Select queue"></select>
         </div>
+        <p id="queue-load-error" class="hint warn hidden"></p>
         <div class="on-queue-row">
           <button type="button" id="btn-on-queue" class="btn btn-primary">Go On Queue</button>
           <button type="button" id="btn-off-queue" class="btn btn-secondary">Go Off Queue</button>
@@ -208,6 +209,6 @@
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=14"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=15"></script>
 </body>
 </html>

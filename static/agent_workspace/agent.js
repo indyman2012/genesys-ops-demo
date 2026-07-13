@@ -85,6 +85,13 @@
     }
 
     const select = $("queue-select");
+    const queueErr = state.queues_error || "";
+    const queueErrEl = $("queue-load-error");
+    if (queueErrEl) {
+      queueErrEl.textContent = queueErr;
+      queueErrEl.classList.toggle("hidden", !queueErr);
+    }
+    const noQueues = !state.queues || state.queues.length === 0;
     if (!queueSelectDirty || select.options.length === 0) {
       const prev = select.value;
       select.innerHTML = "";
@@ -101,10 +108,11 @@
     }
 
     const onQueue = state.on_queue;
+    select.disabled = noQueues || !!queueErr;
     $("queue-status-text").textContent = onQueue ? "On queue — receiving work" : "Off queue";
     $("queue-status-text").className = "status-pill " + (onQueue ? "on" : "off");
-    $("btn-on-queue").disabled = onQueue;
-    $("btn-off-queue").disabled = !onQueue;
+    $("btn-on-queue").disabled = onQueue || noQueues || !!queueErr;
+    $("btn-off-queue").disabled = !onQueue || noQueues || !!queueErr;
 
     if ($("webrtc-status") && state.media) {
       $("webrtc-status").textContent = state.media.webrtc_ready ? "WebRTC ready" : "WebRTC not ready";

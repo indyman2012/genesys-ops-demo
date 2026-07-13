@@ -48,11 +48,11 @@ Replace the dense Genesys Agent UI for a **voice-first pilot cohort** with the A
 
 ### Phase 1 — Identity + queue membership (week 2)
 
-- [ ] Agent login session (server-side token storage)
-- [ ] Load agent's queues from `GET /api/v2/users/{id}/queues`
-- [ ] **Go On Queue / Off Queue** → `PATCH .../queues/{queueId}` `joined: true/false`
+- [x] Agent login session (server-side token storage)
+- [x] Load agent's queues from `GET /api/v2/users/{id}/queues`
+- [x] **Go On Queue / Off Queue** → `PATCH .../queues/{queueId}` `joined: true/false`
 - [ ] Presence: On Queue, Away, DND (routing status APIs)
-- [ ] Swap `/agent/api/state` from `demo_state` to live service behind feature flag
+- [x] Swap `/agent/api/state` from `demo_state` to live service behind feature flag
 
 ### Phase 2 — WebRTC telephony (weeks 3–4)
 
@@ -105,6 +105,25 @@ Browser (Chrome/Edge)
 ```
 
 **Key rule:** Outbound calls must include `callFromQueueId` on the server — the UI never exposes a free-dial path.
+
+---
+
+## Agent sign-in (Microsoft SSO)
+
+Agents authenticate through **Genesys OAuth** in a **popup** — not a custom login form in ArchWell.
+
+| Step | What happens |
+|------|----------------|
+| 1 | Agent clicks **Sign in** in the workspace |
+| 2 | Popup opens the **native Genesys login** (same as today) |
+| 3 | Agent clicks **Microsoft SSO** — no username/password in normal use |
+| 4 | Popup closes; Flask session holds tokens; workspace loads |
+
+**Org name:** Required only rarely (~1% of sign-ins). Browsers remember the org; the org field usually appears only after a **browser cache clear**. OAuth client and redirect URI are tied to `usw2` — we do not ask agents to type the org on every login.
+
+**Browsers:** Agents have **Chrome** or **Edge** only. **Chrome preferred**; both are supported for OAuth popups, WebRTC, and media device pickers. Stay in one browser per shift (SSO cookies and mic permissions are per browser).
+
+**Do not:** iframe Genesys or Microsoft login (Microsoft blocks iframe SSO).
 
 ---
 
