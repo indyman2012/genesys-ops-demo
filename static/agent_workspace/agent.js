@@ -122,7 +122,8 @@
     const canDial = !state.current_call;
     $("btn-dial").disabled = !canDial;
     $("dial-hint").classList.toggle("hidden", canDial);
-    $("btn-sim-inbound").disabled = !onQueue || !!state.current_call;
+    const simInbound = $("btn-sim-inbound");
+    if (simInbound) simInbound.disabled = !onQueue || !!state.current_call;
 
     const call = state.current_call;
     const waitingPanel = $("call-waiting");
