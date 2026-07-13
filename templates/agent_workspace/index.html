@@ -52,9 +52,9 @@
     <div class="card auth-gate-card">
       <h2 id="auth-gate-title">Sign in to Genesys Cloud</h2>
       <p class="auth-gate-copy">
-        Use your ArchWell credentials to open the agent workspace. Queue and call data load only after sign-in.
+        Click below to open Genesys sign-in (Microsoft SSO). Queue and call data load only after you authenticate.
       </p>
-      <a id="btn-sign-in" class="btn btn-primary" href="{{ url_for('agent.oauth_login') }}">Sign in</a>
+      <button type="button" id="btn-sign-in" class="btn btn-primary">Sign in with Genesys</button>
     </div>
   </section>
   <main id="agent-workspace" class="workspace">
@@ -208,6 +208,6 @@
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=13"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=14"></script>
 </body>
 </html>

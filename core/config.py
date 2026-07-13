@@ -78,16 +78,7 @@ def region_domain(region: str | None = None) -> str:
     return f"{key}.pure.cloud"
 
 
-def get_api_host(region: str | None = None) -> str:
-    load_client_env()
-    explicit = env_first("GENESYS_API_BASE", "PURECLOUD_API_BASE")
-    if explicit:
-        return explicit.rstrip("/")
-    return f"https://api.{region_domain(region)}"
-
-
 def get_login_host(region: str | None = None) -> str:
-    load_client_env()
     explicit = env_first("GENESYS_LOGIN_BASE", "PURECLOUD_LOGIN_BASE")
     if explicit:
         return explicit.rstrip("/")
@@ -95,6 +86,13 @@ def get_login_host(region: str | None = None) -> str:
     if domain == "mypurecloud.com":
         return "https://login.mypurecloud.com"
     return f"https://login.{domain}"
+
+
+def get_api_host(region: str | None = None) -> str:
+    explicit = env_first("GENESYS_API_BASE", "PURECLOUD_API_BASE")
+    if explicit:
+        return explicit.rstrip("/")
+    return f"https://api.{region_domain(region)}"
 
 
 def get_apps_host(region: str | None = None) -> str:

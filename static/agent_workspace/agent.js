@@ -642,6 +642,30 @@
     });
   }
 
+  function openOAuthPopup() {
+    const popup = window.open(
+      "/agent/oauth/login",
+      "genesys-oauth",
+      "width=520,height=720,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes"
+    );
+    if (!popup) {
+      window.alert("Allow popups for this site to sign in with Genesys.");
+    }
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data && event.data.type === "genesys-oauth-success") {
+      refresh(false);
+      return;
+    }
+    if (event.data && event.data.type === "genesys-oauth-error") {
+      window.alert(event.data.message || "Genesys sign-in failed.");
+    }
+  });
+
+  $("btn-sign-in")?.addEventListener("click", openOAuthPopup);
+
   refresh().then(() => {
     if (!state || !needsAuth(state)) {
       initMedia();

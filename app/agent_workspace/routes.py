@@ -3,10 +3,21 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from flask import Blueprint, Response, jsonify, render_template, request, session
+from flask import Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
 
 from app.agent_workspace.demo_reports import aht_trend_report_html
 from app.agent_workspace.demo_state import demo_state
+from app.agent_workspace.oauth import (
+    OAuthConfigError,
+    OAuthExchangeError,
+    authorize_url,
+    clear_session,
+    exchange_code_for_tokens,
+    fetch_current_user,
+    generate_pkce,
+    generate_state,
+    persist_session,
+)
 from core.config import genesys_analytics_dashboards_url
 from core.paths import PROJECT_ROOT
 
@@ -79,6 +90,8 @@ def _public_snapshot(*, jitter: bool = True) -> dict:
     snap["demo_mode"] = False
     snap["authenticated"] = True
     snap["auth_required"] = False
+    snap["agent_name"] = session.get("genesys_user_name") or "Agent"
+    snap["nav"] = {"supervisor": False, "admin": False}
     return snap
 
 
@@ -127,26 +140,115 @@ def health():
     return jsonify({
         "ok": True,
         "demo_mode": bool(current_app.config.get("DEMO_MODE")),
+        "authenticated": _is_authenticated(),
         "service": "agent-workspace",
     })
 
 
 @agent_bp.route("/oauth/login")
 def oauth_login():
-    """OAuth sign-in entry — wired in Phase 1 pilot build."""
     from flask import current_app
 
     if current_app.config.get("DEMO_MODE"):
         return render_template(
-            "agent_workspace/oauth_placeholder.html",
+            "agent_workspace/oauth_error.html",
             demo_mode=True,
             message="Demo mode does not require sign-in.",
+            popup=False,
         )
-    return render_template(
-        "agent_workspace/oauth_placeholder.html",
-        demo_mode=False,
-        message="Genesys sign-in is being connected. Check back after the OAuth build lands.",
-    )
+
+    try:
+        verifier, challenge = generate_pkce()
+        oauth_state = generate_state()
+        session["oauth_pkce_verifier"] = verifier
+        session["oauth_state"] = oauth_state
+        return redirect(authorize_url(state=oauth_state, code_challenge=challenge))
+    except OAuthConfigError as exc:
+        return (
+            render_template(
+                "agent_workspace/oauth_error.html",
+                message=str(exc),
+                popup=bool(request.args.get("popup")),
+            ),
+            500,
+        )
+
+
+@agent_bp.route("/oauth/callback")
+def oauth_callback():
+    from flask import current_app
+
+    if current_app.config.get("DEMO_MODE"):
+        return redirect(url_for("agent.index"))
+
+    oauth_error = request.args.get("error")
+    if oauth_error:
+        description = request.args.get("error_description") or oauth_error
+        return (
+            render_template(
+                "agent_workspace/oauth_error.html",
+                message=description,
+                popup=True,
+            ),
+            400,
+        )
+
+    code = request.args.get("code")
+    returned_state = request.args.get("state")
+    expected_state = session.get("oauth_state")
+    if not code:
+        return (
+            render_template(
+                "agent_workspace/oauth_error.html",
+                message="Missing authorization code from Genesys.",
+                popup=True,
+            ),
+            400,
+        )
+    if not expected_state or returned_state != expected_state:
+        return (
+            render_template(
+                "agent_workspace/oauth_error.html",
+                message="OAuth state mismatch. Please try signing in again.",
+                popup=True,
+            ),
+            400,
+        )
+
+    verifier = session.get("oauth_pkce_verifier")
+    if not verifier:
+        return (
+            render_template(
+                "agent_workspace/oauth_error.html",
+                message="OAuth session expired. Please try signing in again.",
+                popup=True,
+            ),
+            400,
+        )
+
+    try:
+        tokens = exchange_code_for_tokens(code=code, code_verifier=verifier)
+        user = fetch_current_user(tokens.access_token)
+        persist_session(session, tokens=tokens, user=user)
+        return render_template(
+            "agent_workspace/oauth_callback.html",
+            user_name=user.display_name,
+        )
+    except OAuthExchangeError as exc:
+        return (
+            render_template(
+                "agent_workspace/oauth_error.html",
+                message=str(exc),
+                popup=True,
+            ),
+            500,
+        )
+
+
+@agent_bp.route("/oauth/logout", methods=["GET", "POST"])
+def oauth_logout():
+    clear_session(session)
+    return redirect(url_for("agent.index"))
 
 
 @agent_bp.route("/api/state")
@@ -267,6 +369,8 @@ def api_refresh_stats():
 
 
 def create_app(*, demo_mode: bool = False):
+    from datetime import timedelta
+
     from flask import Flask
 
     if demo_mode:
@@ -286,5 +390,9 @@ def create_app(*, demo_mode: bool = False):
         "FLASK_SECRET_KEY",
         "genesys-agent-demo" if demo_mode else "genesys-agent-local",
     )
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = not app.config["DEMO_MODE"]
     app.register_blueprint(agent_bp)
     return app
