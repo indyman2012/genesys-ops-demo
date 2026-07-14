@@ -96,6 +96,8 @@ gunicorn agent_app:app --bind 0.0.0.0:$PORT --timeout 120
 
 ---
 
+## Architecture
+
 ```
 Browser (Chrome/Edge)
   └── Agent Workspace UI (templates + agent.js)
@@ -105,6 +107,48 @@ Browser (Chrome/Edge)
 ```
 
 **Key rule:** Outbound calls must include `callFromQueueId` on the server — the UI never exposes a free-dial path.
+
+---
+
+## Genesys SDK reference (guidance, not a rewrite)
+
+ArchWell Agent Workspace is a **standalone** web app — not an iframe panel inside the native Genesys desktop. Official Genesys JS libraries are **reference material** as we wire telephony and real-time panels; they do not replace our Flask shell, OAuth session, or UI.
+
+### Two libraries — do not mix them up
+
+| Library | Repo / package | Use for ArchWell pilot? |
+|---------|----------------|-------------------------|
+| **Platform API JS Client** | [platform-client-sdk-javascript](https://github.com/MyPureCloud/platform-client-sdk-javascript) · `purecloud-platform-client-v2` | **Yes** — headless agent workspace: REST, notification WebSocket, conversations, presence, WebRTC |
+| **Client Apps SDK** | [client-app-sdk](https://github.com/MyPureCloud/client-app-sdk) · `purecloud-client-app-sdk` | **Reference only** — apps embedded *inside* Genesys Cloud UI (iframe lifecycle, toasts, parent-frame navigation) |
+
+Genesys documents the split explicitly: Client Apps SDK handles **UI integration with the Genesys desktop**; **data and telephony** go through the Platform API client.
+
+### What we keep vs what we borrow
+
+| Ours (keep) | Borrow from Genesys docs/SDKs |
+|-------------|-------------------------------|
+| ArchWell UI, queue layout, supervisor reports | Conversation/notification API shapes |
+| Flask OAuth + server-side token storage | WebRTC + media patterns in Platform SDK |
+| Server-gated dial-on-behalf (`callFromQueueId`) | Presence / routing status APIs |
+| Pilot queue allowlist, session `joined` PATCH | Real-time panel data (waiting, active, membership) |
+
+### Phase → likely SDK touchpoints
+
+| Phase | Primary reference |
+|-------|-------------------|
+| **1** (done) | REST via Flask + bearer token — same APIs Platform SDK wraps |
+| **2** WebRTC | Platform SDK in browser; token from Flask session (or SDK auth aligned with existing OAuth client) |
+| **3** Live panels | Platform SDK notifications channel + Conversations / Analytics APIs |
+| **4** Polish | Client Apps docs only if we add a **hybrid** embedded widget in native Genesys later |
+
+### Helpful Genesys links
+
+- [Client Apps developer guides](https://developer.mypurecloud.com/api/client-apps/index.html) — integration patterns, app registration (`embedded-client-app`)
+- [Client Apps SDK API](https://developer.mypurecloud.com/api/client-apps/sdk.html) — lifecycle, alerting (embedded apps)
+- [Platform API JS Client docs](https://mypurecloud.github.io/platform-client-sdk-javascript/) — API surface we will call from `agent.js`
+- CDN (Platform): `https://sdk-cdn.mypurecloud.com/javascript/latest/purecloud-platform-client-v2.min.js`
+
+**Region:** ArchWell org is `usw2` — Platform SDK environment must match (`us_west_2` / `usw2.pure.cloud`).
 
 ---
 
@@ -175,4 +219,6 @@ GENESYS_AGENT_REDIRECT_URI=https://YOUR-PILOT-SERVICE.onrender.com/agent/oauth/c
 
 - [README-AGENT-DEMO.md](../README-AGENT-DEMO.md) — demo deploy (Render)
 - [README-DEMO.md](../README-DEMO.md) — ops console demo
+- [Genesys Client Apps SDK](https://github.com/MyPureCloud/client-app-sdk) — embedded-app patterns (reference)
+- [Genesys Platform API JS Client](https://github.com/MyPureCloud/platform-client-sdk-javascript) — telephony + real-time (primary for Phase 2–3)
 - v1.1 backlog in README-AGENT-DEMO.md (per-queue join, ops back link)
