@@ -428,6 +428,80 @@
     localStorage.setItem(MEDIA_STORAGE_KEY, JSON.stringify(mediaPrefs));
   }
 
+  function setResolvedHint(elementId, text) {
+    const el = $(elementId);
+    if (!el) return;
+    if (!text) {
+      el.textContent = "";
+      el.classList.add("hidden");
+      return;
+    }
+    el.textContent = text;
+    el.classList.remove("hidden");
+  }
+
+  function labelFromDefaultEntry(device) {
+    if (!device || !device.label) return "";
+    const label = device.label.trim();
+    if (!label || label === "System default audio" || label === "Audio device") return "";
+    return label.replace(/^Default\s*[-–]\s*/i, "");
+  }
+
+  async function resolveMicrophoneInUse(devices) {
+    if (!navigator.mediaDevices?.getUserMedia) return "";
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const track = stream.getAudioTracks()[0];
+      const settings = track && track.getSettings ? track.getSettings() : {};
+      const deviceId = settings.deviceId;
+      if (!deviceId) return "";
+      const match = (devices.audioinput || []).find((item) => item.deviceId === deviceId);
+      return match ? deviceLabel(match) : "Audio device";
+    } catch (_) {
+      return "";
+    } finally {
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+    }
+  }
+
+  function resolveSpeakerDefaultLabel(devices) {
+    const outputs = devices.audiooutput || [];
+    for (const deviceId of ["default", "communications"]) {
+      const hint = labelFromDefaultEntry(outputs.find((item) => item.deviceId === deviceId));
+      if (hint) return hint;
+    }
+    return "";
+  }
+
+  async function updateResolvedDeviceHints(devices) {
+    const micSelect = $("media-mic-select");
+    const speakerSelect = $("media-speaker-select");
+    if (!micSelect || !speakerSelect) return;
+
+    if (micSelect.value === "default") {
+      const micName = await resolveMicrophoneInUse(devices);
+      setResolvedHint(
+        "media-mic-resolved",
+        micName ? "Actually using: " + micName : "System default — click Refresh if this looks wrong"
+      );
+    } else {
+      setResolvedHint("media-mic-resolved", "");
+    }
+
+    if (speakerSelect.value === "default") {
+      const speakerName = resolveSpeakerDefaultLabel(devices);
+      setResolvedHint(
+        "media-speaker-resolved",
+        speakerName
+          ? "Default is: " + speakerName
+          : "System default — click Refresh if audio routes to the wrong speaker"
+      );
+    } else {
+      setResolvedHint("media-speaker-resolved", "");
+    }
+  }
+
   function deviceLabel(device) {
     if (!device || device.deviceId === "default") return "System default audio";
     return device.label || "Audio device";
@@ -502,6 +576,7 @@
     );
     await syncMediaToServer("audioinput", micApplied.value, micApplied.label);
     await syncMediaToServer("audiooutput", speakerApplied.value, speakerApplied.label);
+    await updateResolvedDeviceHints(devices);
     return devices;
   }
 
@@ -540,6 +615,7 @@
     const selectedId = kind === "audioinput" ? mediaPrefs.micId : mediaPrefs.speakerId;
     const applied = populateMediaSelect(selectEl, kind, devices, selectedId);
     syncMediaToServer(kind, applied.value, applied.label);
+    await updateResolvedDeviceHints(devices);
     return devices;
   }
 
@@ -611,6 +687,7 @@
     trackKnownDevices(devices);
     populateMediaSelect(micSelect, "audioinput", devices, mediaPrefs.micId);
     populateMediaSelect(speakerSelect, "audiooutput", devices, mediaPrefs.speakerId);
+    await updateResolvedDeviceHints(devices);
 
     micSelect.addEventListener("focus", () => {
       refreshMediaSelect("audioinput");
@@ -618,18 +695,20 @@
     speakerSelect.addEventListener("focus", () => {
       refreshMediaSelect("audiooutput");
     });
-    micSelect.addEventListener("change", () => {
+    micSelect.addEventListener("change", async () => {
       mediaPrefs.micId = micSelect.value;
       saveMediaPrefs();
       const label = micSelect.options[micSelect.selectedIndex]?.textContent || "System default audio";
       syncMediaToServer("audioinput", micSelect.value, label);
+      await updateResolvedDeviceHints(await listAudioDevices({ skipProbe: true }));
     });
-    speakerSelect.addEventListener("change", () => {
+    speakerSelect.addEventListener("change", async () => {
       mediaPrefs.speakerId = speakerSelect.value;
       saveMediaPrefs();
       const label =
         speakerSelect.options[speakerSelect.selectedIndex]?.textContent || "System default audio";
       syncMediaToServer("audiooutput", speakerSelect.value, label);
+      await updateResolvedDeviceHints(await listAudioDevices({ skipProbe: true }));
     });
 
     $("device-modal-yes")?.addEventListener("click", async () => {

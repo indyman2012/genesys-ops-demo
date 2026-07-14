@@ -180,6 +180,14 @@
   margin-top: 0.35rem;
 }
 
+.media-resolved {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--aw-teal);
+  font-weight: 600;
+}
+
 .device-modal {
   position: fixed;
   inset: 0;
