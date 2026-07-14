@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=2">
-  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=13">
+  <link rel="stylesheet" href="{{ url_for('static', filename='agent_workspace/agent.css') }}?v=14">
 </head>
 <body class="agent-page{% if demo_mode %} demo-mode{% endif %}">
   <div class="app-shell">
@@ -83,7 +83,7 @@
 
       <section class="card">
         <h2>Media</h2>
-        <p class="hint">Devices refresh when opened — plug in a headset anytime.</p>
+        <p class="hint">Plug in a headset anytime, or refresh if Windows default audio changed.</p>
         <label class="media-field" for="media-mic-select">
           <span class="label">Microphone</span>
           <select id="media-mic-select" aria-label="Microphone"></select>
@@ -92,6 +92,9 @@
           <span class="label">Speaker</span>
           <select id="media-speaker-select" aria-label="Speaker"></select>
         </label>
+        <button type="button" id="btn-refresh-media" class="btn btn-secondary small">
+          Refresh audio devices
+        </button>
         <p id="webrtc-status" class="webrtc-ok">WebRTC ready</p>
       </section>
 
@@ -221,6 +224,6 @@
   <script>
     window.AGENT_DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
   </script>
-  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=17"></script>
+  <script src="{{ url_for('static', filename='agent_workspace/agent.js') }}?v=18"></script>
 </body>
 </html>

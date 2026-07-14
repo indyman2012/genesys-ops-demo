@@ -371,6 +371,42 @@
   let pendingDevicePrompt = null;
   let mediaPrefs = loadMediaPrefs();
   let mediaInitialized = false;
+  let heldMediaStreams = [];
+
+  function stopHeldMediaStreams() {
+    heldMediaStreams.forEach((stream) => {
+      stream.getTracks().forEach((track) => track.stop());
+    });
+    heldMediaStreams = [];
+  }
+
+  async function probeMicrophoneAccess({ settleMs = 0 } = {}) {
+    if (!navigator.mediaDevices?.getUserMedia) return false;
+    stopHeldMediaStreams();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    heldMediaStreams.push(stream);
+    if (settleMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, settleMs));
+    }
+    stream.getTracks().forEach((track) => track.stop());
+    heldMediaStreams = heldMediaStreams.filter((item) => item !== stream);
+    return true;
+  }
+
+  function setMediaStatus(message, tone) {
+    const statusEl = $("webrtc-status");
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    if (tone === "ok") statusEl.className = "webrtc-ok";
+    else if (tone === "warn") statusEl.className = "hint warn";
+    else statusEl.className = "hint";
+  }
 
   function loadMediaPrefs() {
     try {
@@ -397,15 +433,15 @@
     return device.label || "Audio device";
   }
 
-  async function listAudioDevices() {
+  async function listAudioDevices(options = {}) {
+    const { skipProbe = false, forceProbe = false } = options;
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
       return { ...DEMO_FALLBACK };
     }
     try {
-      if (navigator.mediaDevices.getUserMedia) {
+      if (!skipProbe && navigator.mediaDevices.getUserMedia) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          stream.getTracks().forEach((track) => track.stop());
+          await probeMicrophoneAccess({ settleMs: forceProbe ? 150 : 0 });
         } catch (_) {
           /* labels may stay empty without permission */
         }
@@ -450,6 +486,50 @@
     });
     selectEl.value = value;
     return { value, label: deviceLabel(available.find((d) => d.deviceId === value) || DEFAULT_DEVICE) };
+  }
+
+  async function reloadAllMediaDevices(options = {}) {
+    const devices = await listAudioDevices(options);
+    trackKnownDevices(devices);
+    const micSelect = $("media-mic-select");
+    const speakerSelect = $("media-speaker-select");
+    const micApplied = populateMediaSelect(micSelect, "audioinput", devices, mediaPrefs.micId);
+    const speakerApplied = populateMediaSelect(
+      speakerSelect,
+      "audiooutput",
+      devices,
+      mediaPrefs.speakerId
+    );
+    await syncMediaToServer("audioinput", micApplied.value, micApplied.label);
+    await syncMediaToServer("audiooutput", speakerApplied.value, speakerApplied.label);
+    return devices;
+  }
+
+  async function flushAndReloadMediaDevices() {
+    const refreshBtn = $("btn-refresh-media");
+    if (refreshBtn) refreshBtn.disabled = true;
+    setMediaStatus("Refreshing audio devices…", "pending");
+    try {
+      stopHeldMediaStreams();
+      knownDeviceIds = new Set();
+      const devices = await reloadAllMediaDevices({ forceProbe: true });
+      const micCount = (devices.audioinput || []).length;
+      const speakerCount = (devices.audiooutput || []).length;
+      setMediaStatus(
+        "Audio devices refreshed (" + micCount + " mic, " + speakerCount + " speaker)",
+        "ok"
+      );
+    } catch (err) {
+      console.error("media refresh failed", err);
+      setMediaStatus(
+        err && err.name === "NotAllowedError"
+          ? "Microphone permission required to refresh devices"
+          : "Could not refresh audio devices",
+        "warn"
+      );
+    } finally {
+      if (refreshBtn) refreshBtn.disabled = false;
+    }
   }
 
   async function refreshMediaSelect(kind) {
@@ -561,6 +641,10 @@
     $("device-modal-no")?.addEventListener("click", () => {
       if (pendingDevicePrompt) knownDeviceIds.add(pendingDevicePrompt.deviceId);
       hideDeviceModal();
+    });
+
+    $("btn-refresh-media")?.addEventListener("click", () => {
+      flushAndReloadMediaDevices();
     });
 
     if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
