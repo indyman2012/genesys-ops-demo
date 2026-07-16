@@ -134,6 +134,13 @@
 
     const call = state.current_call;
 
+    const queueCallsHint = document.querySelector(".queue-calls-hint");
+    if (queueCallsHint) {
+      const panelsErr = state.panels_error || "";
+      queueCallsHint.textContent = panelsErr || "Real-time · selected queue";
+      queueCallsHint.classList.toggle("warn", !!panelsErr);
+    }
+
     const waiting = state.calls_waiting || [];
     $("waiting-count").textContent =
       waiting.length === 1 ? "1 waiting" : waiting.length + " waiting";

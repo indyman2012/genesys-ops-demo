@@ -7,8 +7,8 @@ from flask import Blueprint, Response, jsonify, redirect, render_template, reque
 
 from app.agent_workspace.demo_reports import aht_trend_report_html
 from app.agent_workspace.demo_state import demo_state
+from app.agent_workspace.live_api import LiveQueueError
 from app.agent_workspace.live_queues import (
-    LiveQueueError,
     apply_on_queue,
     apply_queue_selection,
     build_live_snapshot,

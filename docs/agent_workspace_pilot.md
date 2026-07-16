@@ -64,9 +64,10 @@ Replace the dense Genesys Agent UI for a **voice-first pilot cohort** with the A
 
 ### Phase 3 — Real-time panels (week 5)
 
-- [ ] Queue membership panel — live members + joined state
-- [ ] Waiting calls — queue conversations API / notifications
-- [ ] Queue activity — observations (`oWaiting`, service level, ASA)
+- [x] Queue membership panel — live members + joined state
+- [x] Waiting calls — activity API + analytics fallback
+- [x] Active calls — activity API + analytics fallback
+- [x] Queue activity — observations + estimated wait time
 - [ ] Agent stats — start with Genesys Analytics aggregates (or defer to supervisor reports)
 
 ### Phase 4 — Pilot polish (week 6)
