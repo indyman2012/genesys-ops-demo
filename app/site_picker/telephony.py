@@ -55,6 +55,137 @@ def _user_request(
     return response.json()
 
 
+def _try_user_request(
+    access_token: str,
+    method: str,
+    path: str,
+    *,
+    params: dict[str, Any] | None = None,
+    json_body: Any = None,
+) -> Any | None:
+    try:
+        return _user_request(
+            access_token,
+            method,
+            path,
+            params=params,
+            json_body=json_body,
+        )
+    except GenesysError as exc:
+        message = str(exc)
+        if "HTTP 403" in message or "HTTP 404" in message:
+            return None
+        raise
+
+
+def _pick_user_station(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    for key in (
+        "effectiveStation",
+        "associatedStation",
+        "defaultStation",
+        "lastAssociatedStation",
+    ):
+        station = (payload or {}).get(key) or {}
+        if isinstance(station, dict) and station.get("id"):
+            return station
+    return None
+
+
+def _phone_from_station(station: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": station.get("id"),
+        "name": station.get("name"),
+        "site": {},
+    }
+
+
+def _fetch_phone_by_id(access_token: str, phone_id: str) -> dict[str, Any] | None:
+    return _try_user_request(
+        access_token,
+        "GET",
+        f"/api/v2/telephony/providers/edges/phones/{phone_id}",
+        params={"expand": "site"},
+    )
+
+
+def _find_phone_via_user_station(access_token: str) -> dict[str, Any] | None:
+    payload = _try_user_request(access_token, "GET", "/api/v2/users/stations/me")
+    station = _pick_user_station(payload if isinstance(payload, dict) else None)
+    if not station:
+        return None
+    phone = _fetch_phone_by_id(access_token, safe_str(station.get("id")))
+    return phone or _phone_from_station(station)
+
+
+def _find_phone_via_webrtc_station(access_token: str, user_id: str) -> dict[str, Any] | None:
+    payload = _try_user_request(
+        access_token,
+        "GET",
+        "/api/v2/stations",
+        params={
+            "webRtcUserId": user_id,
+            "pageSize": 25,
+            "pageNumber": 1,
+        },
+    )
+    entities = (payload or {}).get("entities") or []
+    if not entities:
+        return None
+    station = entities[0]
+    phone = _fetch_phone_by_id(access_token, safe_str(station.get("id")))
+    return phone or _phone_from_station(station)
+
+
+def _find_phone_via_phone_api(
+    access_token: str,
+    *,
+    user_id: str,
+    user_name: str,
+) -> dict[str, Any] | None:
+    if user_id:
+        payload = _try_user_request(
+            access_token,
+            "GET",
+            "/api/v2/telephony/providers/edges/phones",
+            params={
+                "webRtcUser.id": user_id,
+                "fields": "webRtcUser",
+                "expand": "site",
+                "pageSize": 25,
+                "pageNumber": 1,
+            },
+        )
+        entities = (payload or {}).get("entities") or []
+        if entities:
+            return entities[0]
+
+    expected_name = f"{user_name.strip()} Web"
+    payload = _try_user_request(
+        access_token,
+        "GET",
+        "/api/v2/telephony/providers/edges/phones",
+        params={
+            "name": expected_name,
+            "expand": "site",
+            "pageSize": 25,
+            "pageNumber": 1,
+        },
+    )
+    entities = (payload or {}).get("entities") or []
+    if len(entities) == 1:
+        return entities[0]
+
+    expected_key = normalize_phone_key(expected_name)
+    matches = [
+        phone
+        for phone in entities
+        if normalize_phone_key(safe_str(phone.get("name"))) == expected_key
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 def _user_paged_get(access_token: str, path: str, *, page_size: int = 100) -> list[dict[str, Any]]:
     page = 1
     rows: list[dict[str, Any]] = []
@@ -88,56 +219,30 @@ def find_user_web_phone(
     user_id: str,
     user_name: str,
 ) -> dict[str, Any] | None:
-    # Prefer a filtered lookup so agents are not required to list every phone.
-    if user_id:
-        payload = _user_request(
+    # Agent-friendly paths first — avoid the phones inventory API that returns 403
+    # for roles without broad telephony phone permissions.
+    for finder in (
+        lambda: _find_phone_via_user_station(access_token),
+        lambda: _find_phone_via_webrtc_station(access_token, user_id) if user_id else None,
+        lambda: _find_phone_via_phone_api(
             access_token,
-            "GET",
-            "/api/v2/telephony/providers/edges/phones",
-            params={
-                "webRtcUser.id": user_id,
-                "fields": "webRtcUser",
-                "expand": "site",
-                "pageSize": 25,
-                "pageNumber": 1,
-            },
-        )
-        entities = (payload or {}).get("entities") or []
-        if entities:
-            return entities[0]
-
-    expected_name = f"{user_name.strip()} Web"
-    payload = _user_request(
-        access_token,
-        "GET",
-        "/api/v2/telephony/providers/edges/phones",
-        params={
-            "name": expected_name,
-            "expand": "site",
-            "pageSize": 25,
-            "pageNumber": 1,
-        },
-    )
-    entities = (payload or {}).get("entities") or []
-    if len(entities) == 1:
-        return entities[0]
-
-    expected_key = normalize_phone_key(expected_name)
-    matches = [
-        phone
-        for phone in entities
-        if normalize_phone_key(safe_str(phone.get("name"))) == expected_key
-    ]
-    if len(matches) == 1:
-        return matches[0]
+            user_id=user_id,
+            user_name=user_name,
+        ),
+    ):
+        phone = finder()
+        if phone:
+            return phone
     return None
 
 
 def get_phone_detail(access_token: str, phone_id: str) -> dict[str, Any]:
-    return _user_request(
-        access_token,
-        "GET",
-        f"/api/v2/telephony/providers/edges/phones/{phone_id}",
+    phone = _fetch_phone_by_id(access_token, phone_id)
+    if phone:
+        return phone
+    raise GenesysError(
+        "Could not load phone details. Your role may need telephony phone view permission "
+        "for this site, or Telephony > User's phone associations > View."
     )
 
 
