@@ -186,13 +186,19 @@ def health():
 def oauth_login():
     from flask import current_app
 
-    if current_app.config.get("DEMO_MODE"):
+    oauth_for = (request.args.get("for") or "").strip().lower()
+    popup = bool(request.args.get("popup"))
+
+    if current_app.config.get("DEMO_MODE") and oauth_for != "site-picker":
         return render_template(
             "agent_workspace/oauth_error.html",
             demo_mode=True,
             message="Demo mode does not require sign-in.",
-            popup=False,
+            popup=popup,
         )
+
+    if oauth_for == "site-picker":
+        session["oauth_for"] = "site-picker"
 
     try:
         verifier: str | None = None
@@ -210,7 +216,7 @@ def oauth_login():
             render_template(
                 "agent_workspace/oauth_error.html",
                 message=str(exc),
-                popup=bool(request.args.get("popup")),
+                popup=popup,
             ),
             500,
         )
@@ -220,7 +226,8 @@ def oauth_login():
 def oauth_callback():
     from flask import current_app
 
-    if current_app.config.get("DEMO_MODE"):
+    oauth_for = session.get("oauth_for")
+    if current_app.config.get("DEMO_MODE") and oauth_for != "site-picker":
         return redirect(url_for("agent.index"))
 
     oauth_error = request.args.get("error")
@@ -275,6 +282,7 @@ def oauth_callback():
         )
         user = fetch_current_user(tokens.access_token)
         persist_session(session, tokens=tokens, user=user)
+        session.pop("oauth_for", None)
         return render_template(
             "agent_workspace/oauth_callback.html",
             user_name=user.display_name,

@@ -99,8 +99,11 @@
           lines.push("OAuth may already exist on genesys-agent-pilot — copy those GENESYS_AGENT_* vars here, or use /site-picker on that service.");
         }
         if (setup.redirect_uri) {
-          lines.push("Register this OAuth redirect URI in Genesys Admin:");
+          lines.push("Genesys OAuth redirect URI for this service (must be registered exactly):");
           lines.push(setup.redirect_uri);
+        }
+        if (setup.uses_agent_oauth_callback) {
+          lines.push("Site picker sign-in reuses /agent/oauth/callback — you do not need a separate /site-picker/oauth/callback unless you use the bookmarklet bridge only.");
         }
         warning.innerHTML = lines.map(function (line) {
           return "<div>" + line + "</div>";
@@ -284,9 +287,10 @@
   }
 
   function openOAuthPopup() {
-    var popup = window.open(apiUrl("oauth/login?popup=1"), "genesys-oauth", "width=520,height=720");
+    var loginUrl = window.location.origin + "/agent/oauth/login?popup=1&for=site-picker";
+    var popup = window.open(loginUrl, "genesys-oauth", "width=520,height=720");
     if (!popup) {
-      window.location.href = apiUrl("oauth/login");
+      window.location.href = loginUrl;
     }
   }
 

@@ -193,7 +193,7 @@ def api_setup():
     try:
         get_client_credentials()
         has_admin = True
-    except RuntimeError:
+    except (RuntimeError, FileNotFoundError):
         has_admin = bool(
             (env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID") or "").strip()
             and (env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET") or "").strip()
@@ -243,34 +243,10 @@ def api_bridge():
 
 @site_picker_bp.route("/oauth/login")
 def oauth_login():
-    popup = bool(request.args.get("popup"))
-    try:
-        verifier: str | None = None
-        challenge: str | None = None
-        redirect_uri = site_picker_redirect_uri()
-        if use_pkce():
-            verifier, challenge = generate_pkce()
-            session["oauth_pkce_verifier"] = verifier
-        else:
-            session.pop("oauth_pkce_verifier", None)
-        oauth_state = generate_state()
-        session["oauth_state"] = oauth_state
-        return redirect(
-            authorize_url(
-                state=oauth_state,
-                code_challenge=challenge,
-                redirect_uri=redirect_uri,
-            )
-        )
-    except OAuthConfigError as exc:
-        return (
-            render_template(
-                "agent_workspace/oauth_error.html",
-                message=str(exc),
-                popup=popup,
-            ),
-            500,
-        )
+    """Reuse the agent OAuth client + registered /agent/oauth/callback redirect."""
+    popup = "1" if request.args.get("popup") else "0"
+    target = f"/agent/oauth/login?popup={popup}&for=site-picker"
+    return redirect(target)
 
 
 @site_picker_bp.route("/oauth/callback")

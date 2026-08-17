@@ -53,7 +53,20 @@ def agent_oauth_client_secret() -> str:
 
 
 def agent_oauth_redirect_uri() -> str:
-    return (env_first("GENESYS_AGENT_REDIRECT_URI", "AGENT_OAUTH_REDIRECT_URI") or "").strip()
+    explicit = (env_first("GENESYS_AGENT_REDIRECT_URI", "AGENT_OAUTH_REDIRECT_URI") or "").strip()
+    render_url = (env_first("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+    if render_url:
+        service_callback = f"{render_url}/agent/oauth/callback"
+        if not explicit:
+            return service_callback
+        if explicit.rstrip("/") != service_callback.rstrip("/"):
+            from urllib.parse import urlparse
+
+            explicit_host = urlparse(explicit).netloc
+            render_host = urlparse(render_url).netloc
+            if explicit_host and render_host and explicit_host != render_host:
+                return service_callback
+    return explicit
 
 
 def oauth_env_probe() -> dict[str, bool]:
@@ -124,19 +137,21 @@ def site_picker_oauth_settings() -> AgentOAuthSettings:
 
 def site_picker_oauth_status() -> dict[str, Any]:
     """Non-secret OAuth wiring check for site picker UI and Render setup."""
-    redirect_uri = site_picker_redirect_uri()
+    redirect_uri = agent_oauth_redirect_uri() or site_picker_redirect_uri()
     missing: list[str] = []
     if not agent_oauth_client_id():
         missing.append("GENESYS_AGENT_CLIENT_ID")
     if not agent_oauth_client_secret():
         missing.append("GENESYS_AGENT_CLIENT_SECRET")
     if not redirect_uri:
-        missing.append("GENESYS_SITE_PICKER_REDIRECT_URI")
+        missing.append("GENESYS_AGENT_REDIRECT_URI")
     client_id = agent_oauth_client_id()
     return {
         "oauth_ready": not missing,
         "missing_env": missing,
         "redirect_uri": redirect_uri,
+        "site_picker_redirect_uri": site_picker_redirect_uri(),
+        "uses_agent_oauth_callback": True,
         "login_host": get_login_host(),
         "pkce": use_pkce(),
         "client_id": client_id[:8] + "…" if len(client_id) > 8 else client_id,
