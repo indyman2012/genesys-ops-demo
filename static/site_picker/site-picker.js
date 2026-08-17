@@ -1,9 +1,24 @@
 (function () {
   "use strict";
 
-  var PICKER_ORIGIN = window.location.origin;
   var PICKER_WINDOW_NAME = "genesys-site-picker";
   var appsUrl = "https://apps.usw2.pure.cloud";
+
+  var scriptEl = document.querySelector("script[src*='site-picker.js']");
+  var API_BASE = "/";
+  if (scriptEl && scriptEl.src) {
+    try {
+      API_BASE = new URL(scriptEl.src).pathname.replace(/assets\/site-picker\.js$/, "");
+    } catch (_e) {
+      API_BASE = "/";
+    }
+  }
+  if (!API_BASE.endsWith("/")) {
+    API_BASE += "/";
+  }
+
+  var PICKER_ORIGIN = window.location.origin;
+  var PICKER_URL = PICKER_ORIGIN + API_BASE;
 
   window.name = PICKER_WINDOW_NAME;
 
@@ -11,9 +26,25 @@
     return document.getElementById(id);
   }
 
+  function apiUrl(path) {
+    return API_BASE + path.replace(/^\//, "");
+  }
+
   function showPanel(name) {
     $("panel-connect").classList.toggle("active", name === "connect");
     $("panel-main").classList.toggle("active", name === "main");
+  }
+
+  function showConnectStatus(kind, message) {
+    var el = $("connect-status");
+    if (!el) return;
+    if (!message) {
+      el.className = "result";
+      el.textContent = "";
+      return;
+    }
+    el.className = "result show " + (kind === "ok" ? "ok" : kind === "info" ? "info" : "err");
+    el.textContent = message;
   }
 
   function showResult(kind, message) {
@@ -28,61 +59,11 @@
     el.textContent = "";
   }
 
-  function extractTokenFromValue(raw) {
-    if (!raw) return null;
-    if (typeof raw === "string") {
-      var jwt = raw.match(/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
-      if (jwt) return jwt[0];
-    }
-    try {
-      var parsed = JSON.parse(raw);
-      return walkForToken(parsed);
-    } catch (_e) {
-      return null;
-    }
-  }
-
-  function walkForToken(obj) {
-    if (!obj || typeof obj !== "object") return null;
-    if (typeof obj.accessToken === "string" && obj.accessToken.length > 20) return obj.accessToken;
-    if (typeof obj.access_token === "string" && obj.access_token.length > 20) return obj.access_token;
-    if (typeof obj.token === "string" && obj.token.length > 20) return obj.token;
-    if (typeof obj.value === "string" && obj.value.indexOf("eyJ") === 0) return obj.value;
-    if (Array.isArray(obj)) {
-      for (var i = 0; i < obj.length; i++) {
-        var found = walkForToken(obj[i]);
-        if (found) return found;
-      }
-      return null;
-    }
-    for (var key in obj) {
-      if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
-      var nested = walkForToken(obj[key]);
-      if (nested) return nested;
-    }
-    return null;
-  }
-
-  function tokenFromSdkGlobals() {
-    try {
-      var clients = [
-        window.purecloud && window.purecloud.ApiClient && window.purecloud.ApiClient.instance,
-        window.platformClient && window.platformClient.ApiClient && window.platformClient.ApiClient.instance
-      ];
-      for (var i = 0; i < clients.length; i++) {
-        var inst = clients[i];
-        if (!inst || !inst.authentications) continue;
-        var auth = inst.authentications.accessToken || inst.authentications.AccessToken;
-        if (auth && auth.accessToken) return auth.accessToken;
-      }
-    } catch (_e) {}
-    return null;
-  }
-
   function buildBookmarkletHref() {
     var code = [
       "javascript:(function(){",
       "var ORIGIN=" + JSON.stringify(PICKER_ORIGIN) + ";",
+      "var PICKER_URL=" + JSON.stringify(PICKER_URL) + ";",
       "var NAME=" + JSON.stringify(PICKER_WINDOW_NAME) + ";",
       "var host=location.hostname||'';",
       "var onGenesys=host.indexOf('pure.cloud')!==-1||host.indexOf('mypurecloud.com')!==-1;",
@@ -106,16 +87,23 @@
       "var token=findToken();",
       "if(!token){alert('Could not read a Genesys session from this tab. Use Sign in with Genesys on the Site Picker page instead.');return;}",
       "var target=window.open('',NAME);",
-      "if(!target){alert('Keep the Site Picker page open in another tab, then run this bookmark again on Genesys.');return;}",
-      "target.postMessage({type:'genesys-token-bridge',access_token:token},ORIGIN);",
-      "alert('Linked to Site Picker. Switch back to that tab.');",
+      "if(!target||target.closed){target=window.open(PICKER_URL,NAME);}",
+      "if(!target){alert('Allow pop-ups, keep the Site Picker page open, then run this bookmark again.');return;}",
+      "var sent=false,attempts=0,maxAttempts=12;",
+      "function send(){attempts++;try{target.postMessage({type:'genesys-token-bridge',access_token:token},ORIGIN);}catch(e){}}",
+      "function done(ok){window.removeEventListener('message',onAck);clearInterval(retry);",
+      "alert(ok?'Linked to Site Picker. Switch back to that tab.':'Site Picker did not confirm the link. Switch to that tab and click Refresh, or use Sign in with Genesys.');}",
+      "function onAck(ev){if(ev.origin!==ORIGIN)return;var d=ev.data||{};if(d.type==='genesys-token-bridge-ack'){sent=true;done(true);}}",
+      "window.addEventListener('message',onAck);",
+      "send();",
+      "var retry=setInterval(function(){if(sent){clearInterval(retry);return;}if(attempts>=maxAttempts){done(false);return;}try{target.focus();}catch(e){}send();},500);",
       "})();"
     ].join("");
     return code;
   }
 
   function bridgeToken(accessToken) {
-    return fetch("api/bridge", {
+    return fetch(apiUrl("api/bridge"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -131,9 +119,13 @@
   }
 
   function loadState() {
-    return fetch("api/state", { credentials: "same-origin" })
+    return fetch(apiUrl("api/state"), { credentials: "same-origin" })
       .then(function (res) { return res.json(); })
-      .then(renderState);
+      .then(renderState)
+      .catch(function (err) {
+        showConnectStatus("err", err.message || String(err));
+        throw err;
+      });
   }
 
   function renderState(state) {
@@ -154,6 +146,7 @@
       return state;
     }
 
+    showConnectStatus("", "");
     showPanel("main");
     $("user-name").textContent = (state.user && state.user.name) || "Signed in";
     $("user-email").textContent = (state.user && state.user.email) || "";
@@ -206,7 +199,7 @@
     $("btn-change").disabled = true;
     clearResult();
 
-    fetch("api/change-site", {
+    fetch(apiUrl("api/change-site"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -237,9 +230,9 @@
   }
 
   function openOAuthPopup() {
-    var popup = window.open("oauth/login?popup=1", "genesys-oauth", "width=520,height=720");
+    var popup = window.open(apiUrl("oauth/login?popup=1"), "genesys-oauth", "width=520,height=720");
     if (!popup) {
-      window.location.href = "oauth/login";
+      window.location.href = apiUrl("oauth/login");
     }
   }
 
@@ -248,25 +241,36 @@
   }
 
   function signOut() {
-    fetch("oauth/logout", { method: "POST", credentials: "same-origin" })
+    fetch(apiUrl("oauth/logout"), { method: "POST", credentials: "same-origin" })
       .then(function () { return loadState(); });
   }
 
-  window.addEventListener("message", function (event) {
-    var allowed = [PICKER_ORIGIN];
-    if (allowed.indexOf(event.origin) === -1 &&
-        event.origin.indexOf("pure.cloud") === -1 &&
+  function handleTokenBridge(event) {
+    if (event.origin.indexOf("pure.cloud") === -1 &&
         event.origin.indexOf("mypurecloud.com") === -1) {
       return;
     }
     var data = event.data || {};
     if (data.type !== "genesys-token-bridge" || !data.access_token) return;
 
+    showConnectStatus("info", "Link received from Genesys tab. Signing you in…");
+
     bridgeToken(data.access_token)
       .then(function () { return loadState(); })
-      .then(function () { showResult("ok", "Linked from your Genesys tab."); })
-      .catch(function (err) { showResult("err", err.message || String(err)); });
-  });
+      .then(function (state) {
+        if (state.authenticated) {
+          showConnectStatus("ok", "Linked successfully.");
+          if (event.source && event.source.postMessage) {
+            event.source.postMessage({ type: "genesys-token-bridge-ack" }, event.origin);
+          }
+        } else {
+          throw new Error("Session was not created. Try Sign in with Genesys instead.");
+        }
+      })
+      .catch(function (err) {
+        showConnectStatus("err", err.message || String(err));
+      });
+  }
 
   var bookmarklet = $("bookmarklet");
   bookmarklet.href = buildBookmarkletHref();
@@ -286,12 +290,18 @@
   $("btn-refresh").addEventListener("click", loadState);
   $("btn-sign-out").addEventListener("click", signOut);
 
+  window.addEventListener("message", handleTokenBridge);
+
   window.addEventListener("message", function (event) {
     if (event.origin !== PICKER_ORIGIN) return;
     if (event.data && event.data.type === "genesys-oauth-success") {
       loadState();
     }
   });
+
+  if (!window.location.pathname.endsWith("/")) {
+    window.history.replaceState(null, "", window.location.pathname + "/" + window.location.search + window.location.hash);
+  }
 
   loadState();
 })();

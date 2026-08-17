@@ -179,6 +179,12 @@ button.ghost {
   color: #8b1010;
 }
 
+.result.info {
+  background: #eef5ff;
+  border: 1px solid #b3ccf5;
+  color: #0d47a1;
+}
+
 .steps { margin-top: 8px; }
 
 .steps div {

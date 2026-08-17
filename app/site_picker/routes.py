@@ -162,9 +162,15 @@ def _load_state() -> dict[str, Any]:
 
 
 @site_picker_bp.route("/")
-@site_picker_bp.route("")
 def index():
+    if not request.path.endswith("/"):
+        return redirect(f"{request.path}/", code=302)
     return send_from_directory(STATIC_DIR, "index.html")
+
+
+@site_picker_bp.route("")
+def index_no_slash_redirect():
+    return redirect(f"{request.path}/", code=302)
 
 
 @site_picker_bp.route("/assets/<path:filename>")
