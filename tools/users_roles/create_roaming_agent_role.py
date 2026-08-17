@@ -86,7 +86,7 @@ def base_policies() -> list[dict[str, Any]]:
     ]
 
 
-def discover_phone_entity(client) -> str:
+def discover_phone_site_policies(client, site_ids: list[str]) -> tuple[str, list[dict[str, Any]]]:
     payload = client.request(
         "GET",
         "/api/v2/authorization/permissions",
@@ -113,33 +113,51 @@ def discover_phone_entity(client) -> str:
     for candidate in PHONE_ENTITY_CANDIDATES:
         actions = available.get(candidate) or set()
         if {"view", "edit"}.issubset(actions):
-            return candidate
+            return candidate, phone_site_policies(site_ids, phone_entity=candidate, actions=["view", "edit"])
+        if "assign" in actions:
+            return candidate, phone_site_policies(site_ids, phone_entity=candidate, actions=["assign"])
 
     for entity_type, actions in sorted(available.items()):
         if "phone" in entity_type.lower() and {"view", "edit"}.issubset(actions):
-            return entity_type
+            return entity_type, phone_site_policies(site_ids, phone_entity=entity_type, actions=["view", "edit"])
+        if "phone" in entity_type.lower() and "assign" in actions:
+            return entity_type, phone_site_policies(site_ids, phone_entity=entity_type, actions=["assign"])
 
     raise GenesysError(
-        "Could not find a telephony phone entity with view+edit in the permissions catalog. "
+        "Could not find a telephony phone entity with view+edit or assign in the permissions catalog. "
         f"Checked: {', '.join(PHONE_ENTITY_CANDIDATES)}"
     )
 
 
-def phone_site_policies(site_ids: list[str], *, phone_entity: str) -> list[dict[str, Any]]:
+def phone_site_policies(
+    site_ids: list[str],
+    *,
+    phone_entity: str,
+    actions: list[str] | None = None,
+) -> list[dict[str, Any]]:
     if not site_ids:
         return []
     return [
         _policy(
             domain="telephony",
             entity_name=phone_entity,
-            actions=["view", "edit"],
+            actions=actions or ["view", "edit"],
             site_ids=site_ids,
         )
     ]
 
 
-def build_policies(site_ids: list[str], *, phone_entity: str) -> list[dict[str, Any]]:
-    return base_policies() + phone_site_policies(site_ids, phone_entity=phone_entity)
+def build_policies(
+    site_ids: list[str],
+    *,
+    phone_entity: str,
+    phone_actions: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    return base_policies() + phone_site_policies(
+        site_ids,
+        phone_entity=phone_entity,
+        actions=phone_actions,
+    )
 
 
 def resolve_site_ids(client, *, site_ids: list[str], site_names: list[str], all_sites: bool) -> list[str]:
@@ -250,17 +268,22 @@ def main() -> int:
     explicit_site_names = [part.strip() for part in args.site_names.split(",") if part.strip()]
 
     if not args.apply:
-        phone_entity = args.phone_entity.strip() or "sitesManagedPhones"
+        phone_entity = args.phone_entity.strip() or "phone"
         preview_site_ids = explicit_site_ids
         preview = {
             "mode": "DRY_RUN",
             "role_name": args.role_name,
             "description": args.description,
             "phone_entity": phone_entity,
+            "phone_actions": ["view", "edit"],
             "site_ids": preview_site_ids,
             "site_names": explicit_site_names,
             "all_sites": bool(args.all_sites),
-            "permission_policies": build_policies(preview_site_ids, phone_entity=phone_entity),
+            "permission_policies": build_policies(
+                preview_site_ids,
+                phone_entity=phone_entity,
+                phone_actions=["view", "edit"],
+            ),
             "notes": [
                 "Pass --apply with --site-ids, --site-names, and/or --all-sites to create the role.",
                 "Assign this role to agents in addition to their normal agent license role.",
@@ -306,14 +329,20 @@ def main() -> int:
     if not site_ids:
         raise SystemExit("No telephony site IDs resolved; cannot create Roaming Agent role.")
 
-    phone_entity = args.phone_entity.strip() or discover_phone_entity(client)
-    policies = build_policies(site_ids, phone_entity=phone_entity)
+    phone_entity, phone_policy_list = discover_phone_site_policies(client, site_ids)
+    phone_actions = phone_policy_list[0]["actionSet"] if phone_policy_list else []
+    policies = build_policies(
+        site_ids,
+        phone_entity=phone_entity,
+        phone_actions=phone_actions,
+    )
 
     print_mode_banner(
         f'Create/update "{args.role_name}" role',
         apply=True,
         role=args.role_name,
         phone_entity=phone_entity,
+        phone_actions=",".join(phone_actions),
         site_count=str(len(site_ids)),
     )
     print("Policies:")
