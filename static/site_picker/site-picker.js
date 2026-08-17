@@ -209,13 +209,19 @@
     $("user-email").textContent = (state.user && state.user.email) || "";
 
     var phone = state.phone;
+    var phoneNameEl = $("phone-name");
+    var phoneSiteEl = $("phone-site");
     var phoneMeta = $("phone-meta");
     if (phone && phone.id) {
-      phoneMeta.textContent =
-        "WebRTC phone: " + phone.name +
-        (phone.site_name ? " · Current site: " + phone.site_name : "");
+      if (phoneNameEl) phoneNameEl.textContent = phone.name || "Unknown phone";
+      if (phoneSiteEl) {
+        phoneSiteEl.textContent = phone.site_name || phone.site_id || "Unknown site";
+      }
+      if (phoneMeta) phoneMeta.classList.remove("phone-meta-empty");
     } else {
-      phoneMeta.textContent = "No WebRTC phone found for your account.";
+      if (phoneNameEl) phoneNameEl.textContent = "No WebRTC phone found for your account.";
+      if (phoneSiteEl) phoneSiteEl.textContent = "—";
+      if (phoneMeta) phoneMeta.classList.add("phone-meta-empty");
     }
 
     var select = $("site-select");

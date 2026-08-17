@@ -34,6 +34,7 @@ from app.agent_workspace.oauth import (
 )
 from app.site_picker.telephony import (
     change_phone_site,
+    enrich_phone_site_name,
     fetch_sites_with_user_token,
     find_user_web_phone,
     phone_summary,
@@ -121,8 +122,14 @@ def _load_state() -> dict[str, Any]:
     phone = None
     error = ""
 
+    sites_raw: list[dict[str, Any]] = []
+    sites_by_id: dict[str, dict[str, Any]] = {}
+
     try:
         sites_raw = fetch_sites_with_user_token(_access_token())
+        sites_by_id = {
+            str(s.get("id")): s for s in sites_raw if s.get("id")
+        }
         sites = [
             {"id": s.get("id"), "name": s.get("name")}
             for s in sites_raw
@@ -138,7 +145,11 @@ def _load_state() -> dict[str, Any]:
             user_id=str(user["id"]),
             user_name=str(user["name"] or ""),
         )
-        phone = phone_summary(web_phone)
+        phone = enrich_phone_site_name(
+            token,
+            phone_summary(web_phone, sites_by_id=sites_by_id),
+            sites_by_id=sites_by_id,
+        )
     except Exception as exc:
         if not error:
             error = f"Could not load phone: {exc}"
@@ -353,7 +364,19 @@ def api_change_site():
             return jsonify({"error": "You do not have permission for that site."}), 403
 
         change_phone_site(token, phone_id=phone_id, site_id=site_id)
-        updated = phone_summary(find_user_web_phone(token, user_id=user_id, user_name=user_name))
+        sites_by_id = {
+            str(s.get("id")): s
+            for s in fetch_sites_with_user_token(token)
+            if s.get("id")
+        }
+        updated = enrich_phone_site_name(
+            token,
+            phone_summary(
+                find_user_web_phone(token, user_id=user_id, user_name=user_name),
+                sites_by_id=sites_by_id,
+            ),
+            sites_by_id=sites_by_id,
+        )
         return jsonify({"ok": True, "phone": updated})
     except GenesysError as exc:
         return jsonify({"error": str(exc)}), 502

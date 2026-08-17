@@ -166,13 +166,48 @@ def change_phone_site(
     )
 
 
-def phone_summary(phone: dict[str, Any] | None) -> dict[str, Any] | None:
+def phone_summary(
+    phone: dict[str, Any] | None,
+    *,
+    sites_by_id: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     if not phone:
         return None
     site = phone.get("site") or {}
+    site_id = safe_str(site.get("id"))
+    site_name = safe_str(site.get("name"))
+    if site_id and not site_name and sites_by_id:
+        matched = sites_by_id.get(site_id) or {}
+        site_name = safe_str(matched.get("name"))
     return {
         "id": safe_str(phone.get("id")),
         "name": safe_str(phone.get("name")),
-        "site_id": safe_str(site.get("id")),
-        "site_name": safe_str(site.get("name")),
+        "site_id": site_id,
+        "site_name": site_name,
     }
+
+
+def enrich_phone_site_name(
+    access_token: str,
+    phone: dict[str, Any] | None,
+    *,
+    sites_by_id: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    if not phone or phone.get("site_name"):
+        return phone
+    site_id = safe_str(phone.get("site_id"))
+    if not site_id:
+        return phone
+    if sites_by_id:
+        matched = sites_by_id.get(site_id) or {}
+        site_name = safe_str(matched.get("name"))
+        if site_name:
+            return {**phone, "site_name": site_name}
+    try:
+        site = resolve_site(access_token, site_id)
+        site_name = safe_str((site or {}).get("name"))
+        if site_name:
+            return {**phone, "site_name": site_name}
+    except GenesysError:
+        pass
+    return phone

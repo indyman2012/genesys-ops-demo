@@ -103,9 +103,37 @@ select {
 
 .phone-meta {
   font-size: 14px;
-  color: #59636e;
   margin-bottom: 18px;
   line-height: 1.5;
+  border: 1px solid #e5e8ec;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fafbfc;
+}
+
+.phone-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+}
+
+.phone-meta-row + .phone-meta-row {
+  border-top: 1px solid #e5e8ec;
+}
+
+.phone-meta-label {
+  font-weight: 700;
+  color: #17202a;
+}
+
+.phone-meta-value {
+  color: #59636e;
+  text-align: right;
+}
+
+.phone-meta-empty .phone-meta-value {
+  color: #8a939d;
 }
 
 .button-row {
