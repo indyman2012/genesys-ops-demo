@@ -44,16 +44,16 @@ class AgentUser:
     email: str | None
 
 
-def agent_oauth_settings() -> AgentOAuthSettings:
+def agent_oauth_settings(*, redirect_uri: str | None = None) -> AgentOAuthSettings:
     client_id = (env_first("GENESYS_AGENT_CLIENT_ID") or "").strip()
     client_secret = (env_first("GENESYS_AGENT_CLIENT_SECRET") or "").strip()
-    redirect_uri = (env_first("GENESYS_AGENT_REDIRECT_URI") or "").strip()
+    resolved_redirect = (redirect_uri or env_first("GENESYS_AGENT_REDIRECT_URI") or "").strip()
     missing = [
         name
         for name, value in (
             ("GENESYS_AGENT_CLIENT_ID", client_id),
             ("GENESYS_AGENT_CLIENT_SECRET", client_secret),
-            ("GENESYS_AGENT_REDIRECT_URI", redirect_uri),
+            ("GENESYS_AGENT_REDIRECT_URI", resolved_redirect),
         )
         if not value
     ]
@@ -62,8 +62,22 @@ def agent_oauth_settings() -> AgentOAuthSettings:
     return AgentOAuthSettings(
         client_id=client_id,
         client_secret=client_secret,
-        redirect_uri=redirect_uri,
+        redirect_uri=resolved_redirect,
     )
+
+
+def site_picker_redirect_uri() -> str:
+    explicit = (env_first("GENESYS_SITE_PICKER_REDIRECT_URI") or "").strip()
+    if explicit:
+        return explicit
+    render_url = (env_first("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+    if render_url:
+        return f"{render_url}/oauth/callback"
+    return "http://127.0.0.1:8765/oauth/callback"
+
+
+def site_picker_oauth_settings() -> AgentOAuthSettings:
+    return agent_oauth_settings(redirect_uri=site_picker_redirect_uri())
 
 
 def generate_pkce() -> tuple[str, str]:
@@ -83,8 +97,13 @@ def use_pkce() -> bool:
     return value not in ("0", "false", "no", "off")
 
 
-def authorize_url(*, state: str, code_challenge: str | None = None) -> str:
-    settings = agent_oauth_settings()
+def authorize_url(
+    *,
+    state: str,
+    code_challenge: str | None = None,
+    redirect_uri: str | None = None,
+) -> str:
+    settings = agent_oauth_settings(redirect_uri=redirect_uri)
     params = {
         "response_type": "code",
         "client_id": settings.client_id,
@@ -99,8 +118,13 @@ def authorize_url(*, state: str, code_challenge: str | None = None) -> str:
     return f"{get_login_host()}/oauth/authorize?{urlencode(params)}"
 
 
-def exchange_code_for_tokens(*, code: str, code_verifier: str) -> OAuthTokens:
-    settings = agent_oauth_settings()
+def exchange_code_for_tokens(
+    *,
+    code: str,
+    code_verifier: str,
+    redirect_uri: str | None = None,
+) -> OAuthTokens:
+    settings = agent_oauth_settings(redirect_uri=redirect_uri)
     login_host = get_login_host()
     basic = base64.b64encode(
         f"{settings.client_id}:{settings.client_secret}".encode("ascii")

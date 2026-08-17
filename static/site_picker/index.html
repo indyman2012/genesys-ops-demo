@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Genesys Site Picker</title>
+  <link rel="stylesheet" href="/assets/site-picker.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <h1>Change WebRTC Location</h1>
+        <p class="sub">Pick the Genesys telephony site for your Web phone. Only sites you are allowed to use appear in the list.</p>
+      </header>
+      <div class="body">
+        <section id="panel-connect" class="panel active">
+          <div class="warning">
+            Keep this page open. With Genesys Cloud already signed in on another tab, use one of the options below to link your session.
+          </div>
+          <div class="steps">
+            <div><span class="num">1</span><span>Open Genesys Cloud in another browser tab and sign in.</span></div>
+            <div><span class="num">2</span><span>Drag the blue button below to your bookmarks bar, then click it while you are on the Genesys tab.</span></div>
+            <div><span class="num">3</span><span>Return here — your name, phone, and site list will load automatically.</span></div>
+          </div>
+          <p><a id="bookmarklet" class="bookmarklet" href="#">Link Genesys Tab</a></p>
+          <div class="button-row" style="margin-top:22px">
+            <button type="button" class="secondary" id="btn-oauth">Sign in with Genesys instead</button>
+          </div>
+        </section>
+
+        <section id="panel-main" class="panel">
+          <div class="user-row">
+            <div>
+              <strong id="user-name">Agent</strong><br>
+              <span id="user-email"></span>
+            </div>
+            <button type="button" class="ghost" id="btn-sign-out">Sign out</button>
+          </div>
+          <div class="phone-meta" id="phone-meta"></div>
+          <div class="field">
+            <label for="site-select">Telephony site</label>
+            <select id="site-select"></select>
+          </div>
+          <div class="button-row">
+            <button type="button" class="primary" id="btn-change" disabled>Change Location</button>
+            <button type="button" class="secondary" id="btn-refresh">Refresh</button>
+          </div>
+          <div id="result" class="result"></div>
+        </section>
+
+        <details>
+          <summary>Troubleshooting</summary>
+          <div class="inner">
+            <p>If the bookmarklet says no token was found, use <strong>Sign in with Genesys instead</strong>. Your browser SSO should reuse the same login.</p>
+            <p>If no WebRTC phone appears, ask IT to confirm you have a phone named <em>{Your Name} Web</em> assigned in Genesys.</p>
+            <p>If a site is missing from the list, you may not have telephony permissions for that site — contact your supervisor or Genesys admin.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+  <script src="/assets/site-picker.js"></script>
+</body>
+</html>
