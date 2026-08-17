@@ -156,6 +156,8 @@ def run_tool(tool_id: str):
 
 
 def create_app(*, demo_mode: bool = False):
+    from datetime import timedelta
+
     from flask import Flask
 
     if demo_mode:
@@ -170,5 +172,10 @@ def create_app(*, demo_mode: bool = False):
     )
     app.config["DEMO_MODE"] = demo_mode or is_demo_mode()
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "genesys-ops-demo" if demo_mode else "genesys-ops-local")
+    on_render = os.environ.get("RENDER") == "true"
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = on_render or os.environ.get("FLASK_SECURE_COOKIES") == "1"
     app.register_blueprint(ops_bp)
     return app

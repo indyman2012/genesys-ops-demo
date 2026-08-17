@@ -66,14 +66,25 @@ def agent_oauth_settings(*, redirect_uri: str | None = None) -> AgentOAuthSettin
     )
 
 
+def site_picker_mount_path() -> str:
+    explicit = (env_first("GENESYS_SITE_PICKER_MOUNT_PATH") or "").strip().rstrip("/")
+    if explicit:
+        return explicit if explicit.startswith("/") else f"/{explicit}"
+    if (env_first("RENDER_EXTERNAL_URL") or "").strip():
+        return "/site-picker"
+    return ""
+
+
 def site_picker_redirect_uri() -> str:
     explicit = (env_first("GENESYS_SITE_PICKER_REDIRECT_URI") or "").strip()
     if explicit:
         return explicit
     render_url = (env_first("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+    mount = site_picker_mount_path()
     if render_url:
-        return f"{render_url}/oauth/callback"
-    return "http://127.0.0.1:8765/oauth/callback"
+        return f"{render_url}{mount}/oauth/callback"
+    port = (env_first("SITE_PICKER_PORT") or "8765").strip()
+    return f"http://127.0.0.1:{port}{mount}/oauth/callback"
 
 
 def site_picker_oauth_settings() -> AgentOAuthSettings:

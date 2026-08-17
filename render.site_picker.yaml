@@ -1,20 +1,3 @@
-services:
-  - type: web
-    name: archwell-genesys-site-picker
-    runtime: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn site_picker_app:app --bind 0.0.0.0:$PORT --timeout 120
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.13.0"
-      - key: GENESYS_REGION
-        value: usw2
-      # Set in Render dashboard (never commit secrets):
-      # GENESYS_AGENT_CLIENT_ID
-      # GENESYS_AGENT_CLIENT_SECRET
-      # GENESYS_CLIENT_ID          (admin API — phone site updates)
-      # GENESYS_CLIENT_SECRET
-      # FLASK_SECRET_KEY             (random string)
-      # Optional — auto-derived from RENDER_EXTERNAL_URL if omitted:
-      # GENESYS_SITE_PICKER_REDIRECT_URI=https://YOUR-SERVICE.onrender.com/oauth/callback
+# Deprecated — site picker is mounted on ops-demo at /site-picker.
+# Deploy via render.demo.yaml (gunicorn ops_app_demo:app).
+# Do not create a separate Render service for site picker.

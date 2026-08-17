@@ -101,7 +101,7 @@
   }
 
   function bridgeToken(accessToken) {
-    return fetch("/api/bridge", {
+    return fetch("api/bridge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -117,7 +117,7 @@
   }
 
   function loadState() {
-    return fetch("/api/state", { credentials: "same-origin" })
+    return fetch("api/state", { credentials: "same-origin" })
       .then(function (res) { return res.json(); })
       .then(renderState);
   }
@@ -180,7 +180,7 @@
     $("btn-change").disabled = true;
     clearResult();
 
-    fetch("/api/change-site", {
+    fetch("api/change-site", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -211,14 +211,14 @@
   }
 
   function openOAuthPopup() {
-    var popup = window.open("/oauth/login?popup=1", "genesys-oauth", "width=520,height=720");
+    var popup = window.open("oauth/login?popup=1", "genesys-oauth", "width=520,height=720");
     if (!popup) {
-      window.location.href = "/oauth/login";
+      window.location.href = "oauth/login";
     }
   }
 
   function signOut() {
-    fetch("/oauth/logout", { method: "POST", credentials: "same-origin" })
+    fetch("oauth/logout", { method: "POST", credentials: "same-origin" })
       .then(function () { return loadState(); });
   }
 

@@ -162,6 +162,7 @@ def _load_state() -> dict[str, Any]:
 
 
 @site_picker_bp.route("/")
+@site_picker_bp.route("")
 def index():
     return send_from_directory(STATIC_DIR, "index.html")
 
