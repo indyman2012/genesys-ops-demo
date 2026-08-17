@@ -91,6 +91,45 @@ def _pick_user_station(payload: dict[str, Any] | None) -> dict[str, Any] | None:
     return None
 
 
+def _phone_has_site(phone: dict[str, Any]) -> bool:
+    site = phone.get("site") or {}
+    return bool(safe_str(site.get("id")) or safe_str(phone.get("site_id")))
+
+
+def _merge_phone_site_from_filter(
+    access_token: str,
+    user_id: str,
+    phone: dict[str, Any],
+) -> dict[str, Any]:
+    if _phone_has_site(phone) or not user_id:
+        return phone
+
+    payload = _try_user_request(
+        access_token,
+        "GET",
+        "/api/v2/telephony/providers/edges/phones",
+        params={
+            "webRtcUser.id": user_id,
+            "expand": "site",
+            "pageSize": 25,
+            "pageNumber": 1,
+        },
+    )
+    entities = (payload or {}).get("entities") or []
+    if not entities:
+        return phone
+
+    detail = entities[0]
+    merged = dict(phone)
+    if detail.get("id"):
+        merged["id"] = detail["id"]
+    if detail.get("name"):
+        merged["name"] = detail["name"]
+    if detail.get("site"):
+        merged["site"] = detail["site"]
+    return merged
+
+
 def _phone_from_station(station: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": station.get("id"),
@@ -219,8 +258,24 @@ def find_user_web_phone(
     user_id: str,
     user_name: str,
 ) -> dict[str, Any] | None:
-    # Agent-friendly paths first — avoid the phones inventory API that returns 403
-    # for roles without broad telephony phone permissions.
+    # Prefer filtered phone lookup when available — it includes site info agents need.
+    if user_id:
+        payload = _try_user_request(
+            access_token,
+            "GET",
+            "/api/v2/telephony/providers/edges/phones",
+            params={
+                "webRtcUser.id": user_id,
+                "expand": "site",
+                "pageSize": 25,
+                "pageNumber": 1,
+            },
+        )
+        entities = (payload or {}).get("entities") or []
+        if entities:
+            return entities[0]
+
+    # Agent-friendly station paths — avoid the full phone inventory API.
     for finder in (
         lambda: _find_phone_via_user_station(access_token),
         lambda: _find_phone_via_webrtc_station(access_token, user_id) if user_id else None,
@@ -232,18 +287,12 @@ def find_user_web_phone(
     ):
         phone = finder()
         if phone:
-            return phone
+            return _merge_phone_site_from_filter(access_token, user_id, phone)
     return None
 
 
-def get_phone_detail(access_token: str, phone_id: str) -> dict[str, Any]:
-    phone = _fetch_phone_by_id(access_token, phone_id)
-    if phone:
-        return phone
-    raise GenesysError(
-        "Could not load phone details. Your role may need telephony phone view permission "
-        "for this site, or Telephony > User's phone associations > View."
-    )
+def get_phone_detail(access_token: str, phone_id: str) -> dict[str, Any] | None:
+    return _fetch_phone_by_id(access_token, phone_id)
 
 
 def resolve_site(access_token: str, site_id: str) -> dict[str, Any]:
@@ -260,14 +309,31 @@ def change_phone_site(
     phone_id: str,
     site_id: str,
 ) -> dict[str, Any]:
-    phone = get_phone_detail(access_token, phone_id)
     target_site = resolve_site(access_token, site_id)
-    payload = build_phone_update_payload(phone, target_site)
-    return _user_request(
+    phone = get_phone_detail(access_token, phone_id)
+    if phone:
+        payload = build_phone_update_payload(phone, target_site)
+    else:
+        # Agents with phone assign (but not view) can still change site on their own phone.
+        payload = {
+            "site": {
+                "id": target_site["id"],
+                "name": target_site.get("name"),
+            }
+        }
+
+    result = _try_user_request(
         access_token,
         "PUT",
         f"/api/v2/telephony/providers/edges/phones/{phone_id}",
         json_body=payload,
+    )
+    if result is not None:
+        return result
+
+    raise GenesysError(
+        "Could not update phone location. Your role may need Telephony > Phone > Assign "
+        "on the target site, or Telephony > User's phone associations > Edit."
     )
 
 
@@ -289,6 +355,46 @@ def phone_summary(
         "name": safe_str(phone.get("name")),
         "site_id": site_id,
         "site_name": site_name,
+    }
+
+
+def fetch_phone_site_admin_fallback(user_id: str) -> dict[str, str]:
+    """Read-only phone/site lookup via admin client creds when user token cannot view phones."""
+    try:
+        from core.cli import create_client
+        from core.config import get_client_credentials, load_client_env
+
+        load_client_env()
+        get_client_credentials()
+    except Exception:
+        return {}
+
+    try:
+        client = create_client()
+        payload = client.request(
+            "GET",
+            "/api/v2/telephony/providers/edges/phones",
+            params={
+                "webRtcUser.id": user_id,
+                "expand": "site",
+                "pageSize": 5,
+                "pageNumber": 1,
+            },
+        )
+    except GenesysError:
+        return {}
+
+    entities = (payload or {}).get("entities") or []
+    if not entities:
+        return {}
+
+    phone = entities[0]
+    site = phone.get("site") or {}
+    return {
+        "id": safe_str(phone.get("id")),
+        "name": safe_str(phone.get("name")),
+        "site_id": safe_str(site.get("id")),
+        "site_name": safe_str(site.get("name")),
     }
 
 

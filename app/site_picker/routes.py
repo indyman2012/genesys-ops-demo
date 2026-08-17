@@ -35,6 +35,7 @@ from app.agent_workspace.oauth import (
 from app.site_picker.telephony import (
     change_phone_site,
     enrich_phone_site_name,
+    fetch_phone_site_admin_fallback,
     fetch_sites_with_user_token,
     find_user_web_phone,
     phone_summary,
@@ -150,6 +151,16 @@ def _load_state() -> dict[str, Any]:
             phone_summary(web_phone, sites_by_id=sites_by_id),
             sites_by_id=sites_by_id,
         )
+        if phone and not phone.get("site_id"):
+            fallback = fetch_phone_site_admin_fallback(str(user["id"]))
+            if fallback:
+                phone = {
+                    **phone,
+                    "id": phone.get("id") or fallback.get("id"),
+                    "name": phone.get("name") or fallback.get("name"),
+                    "site_id": fallback.get("site_id") or phone.get("site_id"),
+                    "site_name": fallback.get("site_name") or phone.get("site_name"),
+                }
     except Exception as exc:
         if not error:
             error = f"Could not load phone: {exc}"
@@ -377,6 +388,21 @@ def api_change_site():
             ),
             sites_by_id=sites_by_id,
         )
+        if not updated or not updated.get("site_id"):
+            target = sites_by_id.get(site_id) or {}
+            base = updated or phone_summary(web_phone, sites_by_id=sites_by_id) or {}
+            updated = {
+                **base,
+                "site_id": site_id,
+                "site_name": safe_str(target.get("name")) or base.get("site_name") or "",
+            }
+        elif not updated.get("site_name"):
+            target = sites_by_id.get(site_id) or {}
+            updated = {**updated, "site_name": safe_str(target.get("name"))}
+        if updated and not updated.get("site_id"):
+            fallback = fetch_phone_site_admin_fallback(user_id)
+            if fallback:
+                updated = {**updated, **{k: v for k, v in fallback.items() if v}}
         return jsonify({"ok": True, "phone": updated})
     except GenesysError as exc:
         return jsonify({"error": str(exc)}), 502

@@ -215,7 +215,13 @@
     if (phone && phone.id) {
       if (phoneNameEl) phoneNameEl.textContent = phone.name || "Unknown phone";
       if (phoneSiteEl) {
-        phoneSiteEl.textContent = phone.site_name || phone.site_id || "Unknown site";
+        if (phone.site_name) {
+          phoneSiteEl.textContent = phone.site_name;
+        } else if (phone.site_id) {
+          phoneSiteEl.textContent = phone.site_id;
+        } else {
+          phoneSiteEl.textContent = "—";
+        }
       }
       if (phoneMeta) phoneMeta.classList.remove("phone-meta-empty");
     } else {
