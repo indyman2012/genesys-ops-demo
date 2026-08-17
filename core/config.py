@@ -46,8 +46,15 @@ def load_client_env(env_path: Path | None = None) -> Path:
             key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
         return candidate
+
+    client_id = env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID")
+    client_secret = env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET")
+    if client_id and client_secret:
+        return PROJECT_ROOT / "client.env"
+
     raise FileNotFoundError(
         f"client.env not found. Expected at {PROJECT_ROOT / 'client.env'}"
+        " or set GENESYS_CLIENT_ID / GENESYS_CLIENT_SECRET in the environment."
     )
 
 
