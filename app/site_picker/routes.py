@@ -38,7 +38,6 @@ from app.site_picker.telephony import (
     find_user_web_phone,
     phone_summary,
 )
-from core.cli import create_client
 from core.config import get_apps_host, get_login_host
 from core.genesys_client import GenesysError
 from core.paths import PROJECT_ROOT
@@ -103,10 +102,6 @@ def _cors_bridge(f: Callable):
     return wrapped
 
 
-def _admin_client():
-    return create_client()
-
-
 def _load_state() -> dict[str, Any]:
     if not _is_authenticated():
         return {
@@ -137,9 +132,9 @@ def _load_state() -> dict[str, Any]:
         error = f"Could not load sites: {exc}"
 
     try:
-        admin = _admin_client()
+        token = _access_token()
         web_phone = find_user_web_phone(
-            admin,
+            token,
             user_id=str(user["id"]),
             user_name=str(user["name"] or ""),
         )
@@ -186,21 +181,13 @@ def health():
 
 @site_picker_bp.route("/api/setup")
 def api_setup():
-    from core.config import env_first, get_client_credentials
+    from core.config import env_first
 
     oauth = site_picker_oauth_status()
-    has_admin = False
-    try:
-        get_client_credentials()
-        has_admin = True
-    except (RuntimeError, FileNotFoundError):
-        has_admin = bool(
-            (env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID") or "").strip()
-            and (env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET") or "").strip()
-        )
     return jsonify({
         **oauth,
-        "has_admin_creds": has_admin,
+        "has_admin_creds": False,
+        "uses_user_token_for_phones": True,
         "service_url": (env_first("RENDER_EXTERNAL_URL") or "").strip().rstrip("/"),
     })
 
@@ -353,20 +340,20 @@ def api_change_site():
 
     user_id = str(session.get("genesys_user_id") or "")
     user_name = str(session.get("genesys_user_name") or "")
+    token = _access_token()
 
     try:
-        admin = _admin_client()
-        web_phone = find_user_web_phone(admin, user_id=user_id, user_name=user_name)
+        web_phone = find_user_web_phone(token, user_id=user_id, user_name=user_name)
         if not web_phone:
             return jsonify({"error": "No WebRTC phone found for your user account."}), 404
 
         phone_id = str(web_phone.get("id") or "")
-        allowed = {s.get("id") for s in fetch_sites_with_user_token(_access_token())}
+        allowed = {s.get("id") for s in fetch_sites_with_user_token(token)}
         if site_id not in allowed:
             return jsonify({"error": "You do not have permission for that site."}), 403
 
-        change_phone_site(admin, phone_id=phone_id, site_id=site_id)
-        updated = phone_summary(find_user_web_phone(admin, user_id=user_id, user_name=user_name))
+        change_phone_site(token, phone_id=phone_id, site_id=site_id)
+        updated = phone_summary(find_user_web_phone(token, user_id=user_id, user_name=user_name))
         return jsonify({"ok": True, "phone": updated})
     except GenesysError as exc:
         return jsonify({"error": str(exc)}), 502
