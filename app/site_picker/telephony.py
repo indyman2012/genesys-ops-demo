@@ -295,7 +295,36 @@ def get_phone_detail(access_token: str, phone_id: str) -> dict[str, Any] | None:
     return _fetch_phone_by_id(access_token, phone_id)
 
 
-def resolve_site(access_token: str, site_id: str) -> dict[str, Any]:
+SITE_PICKER_BUILD = "2026-06-29-agent-phone-change-v2"
+
+
+def _admin_credentials_available() -> bool:
+    try:
+        from core.config import get_client_credentials, load_client_env
+
+        load_client_env()
+        get_client_credentials()
+        return True
+    except Exception:
+        return False
+
+
+def change_phone_site_admin(phone_id: str, target_site: dict[str, Any]) -> dict[str, Any] | None:
+    if not _admin_credentials_available():
+        return None
+    from core.cli import create_client
+
+    client = create_client()
+    phone = client.request(
+        "GET",
+        f"/api/v2/telephony/providers/edges/phones/{phone_id}",
+    )
+    payload = build_phone_update_payload(phone, target_site)
+    return client.request(
+        "PUT",
+        f"/api/v2/telephony/providers/edges/phones/{phone_id}",
+        json_body=payload,
+    )
     return _user_request(
         access_token,
         "GET",
@@ -310,30 +339,48 @@ def change_phone_site(
     site_id: str,
 ) -> dict[str, Any]:
     target_site = resolve_site(access_token, site_id)
-    phone = get_phone_detail(access_token, phone_id)
-    if phone:
-        payload = build_phone_update_payload(phone, target_site)
-    else:
-        # Agents with phone assign (but not view) can still change site on their own phone.
-        payload = {
-            "site": {
-                "id": target_site["id"],
-                "name": target_site.get("name"),
-            }
+    minimal_payload = {
+        "site": {
+            "id": target_site["id"],
+            "name": target_site.get("name"),
         }
+    }
 
+    # Agents with phone assign (but not view) can often update site with a minimal PUT.
     result = _try_user_request(
         access_token,
         "PUT",
         f"/api/v2/telephony/providers/edges/phones/{phone_id}",
-        json_body=payload,
+        json_body=minimal_payload,
     )
     if result is not None:
-        return result
+        return result or {}
 
+    phone = get_phone_detail(access_token, phone_id)
+    if phone:
+        full_payload = build_phone_update_payload(phone, target_site)
+        result = _try_user_request(
+            access_token,
+            "PUT",
+            f"/api/v2/telephony/providers/edges/phones/{phone_id}",
+            json_body=full_payload,
+        )
+        if result is not None:
+            return result or {}
+
+    admin_result = change_phone_site_admin(phone_id, target_site)
+    if admin_result is not None:
+        return admin_result
+
+    if _admin_credentials_available():
+        raise GenesysError(
+            "Could not update phone location even with the server admin client. "
+            "Check Genesys telephony permissions for the target site."
+        )
     raise GenesysError(
-        "Could not update phone location. Your role may need Telephony > Phone > Assign "
-        "on the target site, or Telephony > User's phone associations > Edit."
+        "Could not update phone location with your agent permissions. "
+        "Ask IT to add GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET on Render for admin fallback, "
+        "or grant Telephony > Phone > Assign on the target site."
     )
 
 

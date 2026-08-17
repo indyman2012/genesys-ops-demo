@@ -41,7 +41,7 @@ from app.site_picker.telephony import (
     phone_summary,
 )
 from core.config import get_apps_host, get_login_host
-from core.genesys_client import GenesysError
+from core.genesys_client import GenesysError, safe_str
 from core.paths import PROJECT_ROOT
 
 site_picker_bp = Blueprint("site_picker", __name__)
@@ -203,12 +203,16 @@ def health():
 
 @site_picker_bp.route("/api/setup")
 def api_setup():
+    from app.site_picker.telephony import SITE_PICKER_BUILD, _admin_credentials_available
     from core.config import env_first
 
     oauth = site_picker_oauth_status()
+    probe = oauth.get("env_probe") or {}
     return jsonify({
         **oauth,
-        "has_admin_creds": False,
+        "build": SITE_PICKER_BUILD,
+        "has_admin_creds": _admin_credentials_available(),
+        "admin_env_set": bool(probe.get("GENESYS_CLIENT_ID") and probe.get("GENESYS_CLIENT_SECRET")),
         "uses_user_token_for_phones": True,
         "service_url": (env_first("RENDER_EXTERNAL_URL") or "").strip().rstrip("/"),
     })
