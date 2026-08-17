@@ -58,7 +58,12 @@ def agent_oauth_settings(*, redirect_uri: str | None = None) -> AgentOAuthSettin
         if not value
     ]
     if missing:
-        raise OAuthConfigError(f"Missing agent OAuth env vars: {', '.join(missing)}")
+        hint = (
+            " Set these in Render → Environment for site picker sign-in."
+            if os.environ.get("RENDER") == "true"
+            else ""
+        )
+        raise OAuthConfigError(f"Missing agent OAuth env vars: {', '.join(missing)}.{hint}")
     return AgentOAuthSettings(
         client_id=client_id,
         client_secret=client_secret,
@@ -89,6 +94,25 @@ def site_picker_redirect_uri() -> str:
 
 def site_picker_oauth_settings() -> AgentOAuthSettings:
     return agent_oauth_settings(redirect_uri=site_picker_redirect_uri())
+
+
+def site_picker_oauth_status() -> dict[str, Any]:
+    """Non-secret OAuth wiring check for site picker UI and Render setup."""
+    redirect_uri = site_picker_redirect_uri()
+    missing: list[str] = []
+    if not (env_first("GENESYS_AGENT_CLIENT_ID") or "").strip():
+        missing.append("GENESYS_AGENT_CLIENT_ID")
+    if not (env_first("GENESYS_AGENT_CLIENT_SECRET") or "").strip():
+        missing.append("GENESYS_AGENT_CLIENT_SECRET")
+    if not redirect_uri:
+        missing.append("GENESYS_SITE_PICKER_REDIRECT_URI")
+    return {
+        "oauth_ready": not missing,
+        "missing_env": missing,
+        "redirect_uri": redirect_uri,
+        "login_host": get_login_host(),
+        "pkce": use_pkce(),
+    }
 
 
 def generate_pkce() -> tuple[str, str]:

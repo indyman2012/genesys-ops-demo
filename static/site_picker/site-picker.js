@@ -59,6 +59,49 @@
     el.textContent = "";
   }
 
+  function sendBridgeAck(event, ok, errorMessage) {
+    if (!event.source || !event.source.postMessage) return;
+    try {
+      event.source.postMessage({
+        type: "genesys-token-bridge-ack",
+        ok: ok,
+        error: errorMessage || ""
+      }, event.origin);
+    } catch (_e) {}
+  }
+
+  function loadSetup() {
+    return fetch(apiUrl("api/setup"), { credentials: "same-origin" })
+      .then(function (res) { return res.json(); })
+      .then(function (setup) {
+        var warning = $("setup-warning");
+        if (!warning) return setup;
+
+        if (setup.oauth_ready) {
+          warning.style.display = "none";
+          return setup;
+        }
+
+        var lines = [
+          "Sign-in is not configured on this server yet.",
+          "Add these Render environment variables:",
+          setup.missing_env && setup.missing_env.length
+            ? setup.missing_env.join(", ")
+            : "GENESYS_AGENT_CLIENT_ID, GENESYS_AGENT_CLIENT_SECRET"
+        ];
+        if (setup.redirect_uri) {
+          lines.push("Register this OAuth redirect URI in Genesys Admin:");
+          lines.push(setup.redirect_uri);
+        }
+        warning.innerHTML = lines.map(function (line) {
+          return "<div>" + line + "</div>";
+        }).join("");
+        warning.style.display = "block";
+        return setup;
+      })
+      .catch(function () { return null; });
+  }
+
   function buildBookmarkletHref() {
     var code = [
       "javascript:(function(){",
@@ -91,9 +134,11 @@
       "if(!target){alert('Allow pop-ups, keep the Site Picker page open, then run this bookmark again.');return;}",
       "var sent=false,attempts=0,maxAttempts=12;",
       "function send(){attempts++;try{target.postMessage({type:'genesys-token-bridge',access_token:token},ORIGIN);}catch(e){}}",
-      "function done(ok){window.removeEventListener('message',onAck);clearInterval(retry);",
-      "alert(ok?'Linked to Site Picker. Switch back to that tab.':'Site Picker did not confirm the link. Switch to that tab and click Refresh, or use Sign in with Genesys.');}",
-      "function onAck(ev){if(ev.origin!==ORIGIN)return;var d=ev.data||{};if(d.type==='genesys-token-bridge-ack'){sent=true;done(true);}}",
+      "function done(ok,err){window.removeEventListener('message',onAck);clearInterval(retry);",
+      "if(ok){alert('Linked to Site Picker. Switch back to that tab.');return;}",
+      "alert(err||'Site Picker did not confirm the link. Switch to that tab and read the error shown there.');}",
+      "function onAck(ev){if(ev.origin!==ORIGIN)return;var d=ev.data||{};if(d.type!=='genesys-token-bridge-ack')return;",
+      "sent=true;done(!!d.ok,d.error||'');}",
       "window.addEventListener('message',onAck);",
       "send();",
       "var retry=setInterval(function(){if(sent){clearInterval(retry);return;}if(attempts>=maxAttempts){done(false);return;}try{target.focus();}catch(e){}send();},500);",
@@ -260,15 +305,15 @@
       .then(function (state) {
         if (state.authenticated) {
           showConnectStatus("ok", "Linked successfully.");
-          if (event.source && event.source.postMessage) {
-            event.source.postMessage({ type: "genesys-token-bridge-ack" }, event.origin);
-          }
+          sendBridgeAck(event, true, "");
         } else {
-          throw new Error("Session was not created. Try Sign in with Genesys instead.");
+          throw new Error("Session was not created. Configure Sign in with Genesys on Render.");
         }
       })
       .catch(function (err) {
-        showConnectStatus("err", err.message || String(err));
+        var message = err.message || String(err);
+        showConnectStatus("err", message);
+        sendBridgeAck(event, false, message);
       });
   }
 
@@ -297,11 +342,15 @@
     if (event.data && event.data.type === "genesys-oauth-success") {
       loadState();
     }
+    if (event.data && event.data.type === "genesys-oauth-error") {
+      showConnectStatus("err", event.data.message || "Sign-in failed.");
+    }
   });
 
   if (!window.location.pathname.endsWith("/")) {
     window.history.replaceState(null, "", window.location.pathname + "/" + window.location.search + window.location.hash);
   }
 
+  loadSetup();
   loadState();
 })();

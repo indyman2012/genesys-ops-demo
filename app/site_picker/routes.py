@@ -28,6 +28,7 @@ from app.agent_workspace.oauth import (
     generate_state,
     persist_session,
     site_picker_oauth_settings,
+    site_picker_oauth_status,
     site_picker_redirect_uri,
     use_pkce,
 )
@@ -183,6 +184,22 @@ def health():
     return jsonify({"ok": True, "service": "site-picker", "authenticated": _is_authenticated()})
 
 
+@site_picker_bp.route("/api/setup")
+def api_setup():
+    from core.config import env_first
+
+    oauth = site_picker_oauth_status()
+    has_admin = bool(
+        (env_first("GENESYS_CLIENT_ID") or "").strip()
+        and (env_first("GENESYS_CLIENT_SECRET") or "").strip()
+    )
+    return jsonify({
+        **oauth,
+        "has_admin_creds": has_admin,
+        "service_url": (env_first("RENDER_EXTERNAL_URL") or "").strip().rstrip("/"),
+    })
+
+
 @site_picker_bp.route("/api/state")
 def api_state():
     return jsonify(_load_state())
@@ -326,15 +343,14 @@ def oauth_callback():
 def oauth_config():
     try:
         settings = site_picker_oauth_settings()
+        status = site_picker_oauth_status()
         return jsonify({
-            "login_host": get_login_host(),
-            "redirect_uri": settings.redirect_uri,
-            "client_id": settings.client_id,
-            "pkce": use_pkce(),
-            "apps_url": get_apps_host(),
+            **status,
+            "client_id": settings.client_id if status["oauth_ready"] else "",
         })
     except OAuthConfigError as exc:
-        return jsonify({"error": str(exc)}), 500
+        status = site_picker_oauth_status()
+        return jsonify({**status, "error": str(exc)}), 500
 
 
 @site_picker_bp.route("/oauth/logout", methods=["POST"])
