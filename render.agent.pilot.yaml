@@ -13,3 +13,4 @@ services:
       # Set in Render dashboard (never commit secrets):
       # GENESYS_AGENT_CLIENT_ID, GENESYS_AGENT_CLIENT_SECRET,
       # GENESYS_AGENT_REDIRECT_URI, FLASK_SECRET_KEY, GENESYS_CLOUD_REGION
+      # Site picker: /site-picker — add redirect https://THIS-SERVICE.onrender.com/site-picker/oauth/callback

@@ -84,11 +84,20 @@
 
         var lines = [
           "Sign-in is not configured on this server yet.",
-          "Add these Render environment variables:",
-          setup.missing_env && setup.missing_env.length
-            ? setup.missing_env.join(", ")
-            : "GENESYS_AGENT_CLIENT_ID, GENESYS_AGENT_CLIENT_SECRET"
+          "This app expects agent OAuth env vars on the same Render service:",
+          "GENESYS_AGENT_CLIENT_ID, GENESYS_AGENT_CLIENT_SECRET"
         ];
+        if (setup.env_probe) {
+          var unset = Object.keys(setup.env_probe).filter(function (key) {
+            return !setup.env_probe[key];
+          });
+          if (unset.length) {
+            lines.push("Unset on this service: " + unset.join(", "));
+          }
+        }
+        if (setup.service_url && setup.service_url.indexOf("ops-demo") !== -1) {
+          lines.push("OAuth may already exist on genesys-agent-pilot — copy those GENESYS_AGENT_* vars here, or use /site-picker on that service.");
+        }
         if (setup.redirect_uri) {
           lines.push("Register this OAuth redirect URI in Genesys Admin:");
           lines.push(setup.redirect_uri);

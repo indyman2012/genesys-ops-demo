@@ -16,8 +16,8 @@ services:
         sync: false
       - key: GENESYS_REGION
         value: usw2
-      # Site picker at /site-picker (also needs agent OAuth for sign-in):
+      # Site picker at /site-picker — copy GENESYS_AGENT_* from genesys-agent-pilot if needed:
       # GENESYS_AGENT_CLIENT_ID
       # GENESYS_AGENT_CLIENT_SECRET
-      # FLASK_SECRET_KEY
-      # OAuth redirect (auto if omitted): https://YOUR-SERVICE.onrender.com/site-picker/oauth/callback
+      # GENESYS_AGENT_USE_PKCE=0   (match agent-pilot OAuth client)
+      # Register redirect: https://THIS-SERVICE.onrender.com/site-picker/oauth/callback

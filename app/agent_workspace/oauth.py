@@ -44,19 +44,45 @@ class AgentUser:
     email: str | None
 
 
+def agent_oauth_client_id() -> str:
+    return (env_first("GENESYS_AGENT_CLIENT_ID", "AGENT_OAUTH_CLIENT_ID") or "").strip()
+
+
+def agent_oauth_client_secret() -> str:
+    return (env_first("GENESYS_AGENT_CLIENT_SECRET", "AGENT_OAUTH_CLIENT_SECRET") or "").strip()
+
+
+def agent_oauth_redirect_uri() -> str:
+    return (env_first("GENESYS_AGENT_REDIRECT_URI", "AGENT_OAUTH_REDIRECT_URI") or "").strip()
+
+
+def oauth_env_probe() -> dict[str, bool]:
+    """Report which known OAuth-related env keys are set (values never returned)."""
+    keys = (
+        "GENESYS_AGENT_CLIENT_ID",
+        "GENESYS_AGENT_CLIENT_SECRET",
+        "GENESYS_AGENT_REDIRECT_URI",
+        "GENESYS_SITE_PICKER_REDIRECT_URI",
+        "GENESYS_AGENT_USE_PKCE",
+        "GENESYS_CLIENT_ID",
+        "GENESYS_CLIENT_SECRET",
+        "FLASK_SECRET_KEY",
+        "RENDER_EXTERNAL_URL",
+    )
+    return {key: bool((env_first(key) or "").strip()) for key in keys}
+
+
 def agent_oauth_settings(*, redirect_uri: str | None = None) -> AgentOAuthSettings:
-    client_id = (env_first("GENESYS_AGENT_CLIENT_ID") or "").strip()
-    client_secret = (env_first("GENESYS_AGENT_CLIENT_SECRET") or "").strip()
-    resolved_redirect = (redirect_uri or env_first("GENESYS_AGENT_REDIRECT_URI") or "").strip()
-    missing = [
-        name
-        for name, value in (
-            ("GENESYS_AGENT_CLIENT_ID", client_id),
-            ("GENESYS_AGENT_CLIENT_SECRET", client_secret),
-            ("GENESYS_AGENT_REDIRECT_URI", resolved_redirect),
-        )
-        if not value
-    ]
+    client_id = agent_oauth_client_id()
+    client_secret = agent_oauth_client_secret()
+    resolved_redirect = (redirect_uri or agent_oauth_redirect_uri()).strip()
+    missing: list[str] = []
+    if not client_id:
+        missing.append("GENESYS_AGENT_CLIENT_ID")
+    if not client_secret:
+        missing.append("GENESYS_AGENT_CLIENT_SECRET")
+    if not resolved_redirect:
+        missing.append("GENESYS_AGENT_REDIRECT_URI")
     if missing:
         hint = (
             " Set these in Render → Environment for site picker sign-in."
@@ -100,18 +126,21 @@ def site_picker_oauth_status() -> dict[str, Any]:
     """Non-secret OAuth wiring check for site picker UI and Render setup."""
     redirect_uri = site_picker_redirect_uri()
     missing: list[str] = []
-    if not (env_first("GENESYS_AGENT_CLIENT_ID") or "").strip():
+    if not agent_oauth_client_id():
         missing.append("GENESYS_AGENT_CLIENT_ID")
-    if not (env_first("GENESYS_AGENT_CLIENT_SECRET") or "").strip():
+    if not agent_oauth_client_secret():
         missing.append("GENESYS_AGENT_CLIENT_SECRET")
     if not redirect_uri:
         missing.append("GENESYS_SITE_PICKER_REDIRECT_URI")
+    client_id = agent_oauth_client_id()
     return {
         "oauth_ready": not missing,
         "missing_env": missing,
         "redirect_uri": redirect_uri,
         "login_host": get_login_host(),
         "pkce": use_pkce(),
+        "client_id": client_id[:8] + "…" if len(client_id) > 8 else client_id,
+        "env_probe": oauth_env_probe(),
     }
 
 

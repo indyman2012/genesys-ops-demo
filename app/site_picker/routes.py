@@ -186,13 +186,18 @@ def health():
 
 @site_picker_bp.route("/api/setup")
 def api_setup():
-    from core.config import env_first
+    from core.config import env_first, get_client_credentials
 
     oauth = site_picker_oauth_status()
-    has_admin = bool(
-        (env_first("GENESYS_CLIENT_ID") or "").strip()
-        and (env_first("GENESYS_CLIENT_SECRET") or "").strip()
-    )
+    has_admin = False
+    try:
+        get_client_credentials()
+        has_admin = True
+    except RuntimeError:
+        has_admin = bool(
+            (env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID") or "").strip()
+            and (env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET") or "").strip()
+        )
     return jsonify({
         **oauth,
         "has_admin_creds": has_admin,
