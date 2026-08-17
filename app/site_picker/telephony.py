@@ -88,17 +88,46 @@ def find_user_web_phone(
     user_id: str,
     user_name: str,
 ) -> dict[str, Any] | None:
-    phones = _user_paged_get(access_token, "/api/v2/telephony/providers/edges/phones")
-    for phone in phones:
-        web_user = phone.get("webRtcUser") or {}
-        if safe_str(web_user.get("id")) == user_id:
-            return phone
+    # Prefer a filtered lookup so agents are not required to list every phone.
+    if user_id:
+        payload = _user_request(
+            access_token,
+            "GET",
+            "/api/v2/telephony/providers/edges/phones",
+            params={
+                "webRtcUser.id": user_id,
+                "fields": "webRtcUser",
+                "expand": "site",
+                "pageSize": 25,
+                "pageNumber": 1,
+            },
+        )
+        entities = (payload or {}).get("entities") or []
+        if entities:
+            return entities[0]
 
-    expected_key = normalize_phone_key(f"{user_name.strip()} Web")
-    matches: list[dict[str, Any]] = []
-    for phone in phones:
-        if normalize_phone_key(safe_str(phone.get("name"))) == expected_key:
-            matches.append(phone)
+    expected_name = f"{user_name.strip()} Web"
+    payload = _user_request(
+        access_token,
+        "GET",
+        "/api/v2/telephony/providers/edges/phones",
+        params={
+            "name": expected_name,
+            "expand": "site",
+            "pageSize": 25,
+            "pageNumber": 1,
+        },
+    )
+    entities = (payload or {}).get("entities") or []
+    if len(entities) == 1:
+        return entities[0]
+
+    expected_key = normalize_phone_key(expected_name)
+    matches = [
+        phone
+        for phone in entities
+        if normalize_phone_key(safe_str(phone.get("name"))) == expected_key
+    ]
     if len(matches) == 1:
         return matches[0]
     return None
