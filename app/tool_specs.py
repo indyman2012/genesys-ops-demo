@@ -348,6 +348,21 @@ TOOL_SPECS: list[ToolSpec] = [
         ],
     },
     {
+        "id": "create_roaming_agent_role",
+        "name": "Create Roaming Agent Role",
+        "category": "Users / Roles",
+        "script": "tools/users_roles/create_roaming_agent_role.py",
+        "template": "",
+        "description": "Create/update minimal Site Picker role (Roaming Agent).",
+        "mutating": True,
+        "apply_flag": "apply",
+        "fields": [
+            _f("site_ids", "text", "Site IDs (comma-separated)", arg="--site-ids"),
+            _f("site_names", "text", "Site names (comma-separated)", arg="--site-names"),
+            _f("all_sites", "checkbox", "All telephony sites", arg="--all-sites"),
+        ],
+    },
+    {
         "id": "create_cx1_test_role",
         "name": "Create CX1 Test Role",
         "category": "Users / Roles",

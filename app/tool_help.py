@@ -85,6 +85,11 @@ TOOL_HELP: dict[str, str] = {
         "Analyzes one user's permissions and classifies CX1 vs CX2 style access. "
         "Read-only — outputs a JSON review file for role design decisions."
     ),
+    "create_roaming_agent_role": (
+        "Creates or updates the Roaming Agent custom role with the minimum telephony "
+        "permissions for the WebRTC Site Picker. Requires --site-ids, --site-names, or "
+        "--all-sites when using --apply."
+    ),
     "create_cx1_test_role": (
         "Builds a voice-only test role from a license review JSON, stripping CX2 permissions. "
         "Dry run writes a preview JSON without creating the role in Genesys."
