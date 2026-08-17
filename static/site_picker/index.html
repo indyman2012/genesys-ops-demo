@@ -15,18 +15,29 @@
       </header>
       <div class="body">
         <section id="panel-connect" class="panel active">
-          <div class="warning">
-            Keep this page open. With Genesys Cloud already signed in on another tab, use one of the options below to link your session.
+          <div class="info">
+            Sign in once below. If you are already logged into Genesys Cloud in this browser, the sign-in popup should complete quickly.
           </div>
-          <div class="steps">
-            <div><span class="num">1</span><span>Open Genesys Cloud in another browser tab and sign in.</span></div>
-            <div><span class="num">2</span><span>Drag the blue button below to your bookmarks bar, then click it while you are on the Genesys tab.</span></div>
-            <div><span class="num">3</span><span>Return here — your name, phone, and site list will load automatically.</span></div>
+          <div class="button-wrap">
+            <button type="button" class="primary" id="btn-oauth">Sign in with Genesys</button>
           </div>
-          <p><a id="bookmarklet" class="bookmarklet" href="#">Link Genesys Tab</a></p>
-          <div class="button-row" style="margin-top:22px">
-            <button type="button" class="secondary" id="btn-oauth">Sign in with Genesys instead</button>
+          <div class="button-row" style="justify-content:center;margin-top:12px">
+            <button type="button" class="secondary" id="btn-open-genesys">Open Genesys Cloud</button>
           </div>
+
+          <details class="advanced">
+            <summary>Advanced: link from an open Genesys tab (bookmarklet)</summary>
+            <div class="inner">
+              <p>The bookmarklet does <strong>not</strong> work on this page. It must be run on your Genesys Cloud tab.</p>
+              <ol>
+                <li>Drag <a id="bookmarklet" class="bookmarklet" href="#" draggable="true">Link Genesys Tab</a> to your bookmarks bar.</li>
+                <li>Open Genesys Cloud and sign in (<span id="genesys-host">apps.usw2.pure.cloud</span>).</li>
+                <li>While on that Genesys tab, click the bookmark you saved.</li>
+                <li>Come back here — your session should load automatically.</li>
+              </ol>
+              <p class="hint">If the bookmarklet still cannot find a token, use <strong>Sign in with Genesys</strong> above instead.</p>
+            </div>
+          </details>
         </section>
 
         <section id="panel-main" class="panel">
@@ -52,7 +63,8 @@
         <details>
           <summary>Troubleshooting</summary>
           <div class="inner">
-            <p>If the bookmarklet says no token was found, use <strong>Sign in with Genesys instead</strong>. Your browser SSO should reuse the same login.</p>
+            <p><strong>Sign in with Genesys</strong> is the recommended path. It does not require the bookmarklet or being on a specific tab.</p>
+            <p>If sign-in fails, confirm the OAuth redirect URI is registered in Genesys Admin for this site.</p>
             <p>If no WebRTC phone appears, ask IT to confirm you have a phone named <em>{Your Name} Web</em> assigned in Genesys.</p>
             <p>If a site is missing from the list, you may not have telephony permissions for that site — contact your supervisor or Genesys admin.</p>
           </div>

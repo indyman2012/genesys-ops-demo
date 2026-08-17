@@ -3,6 +3,7 @@
 
   var PICKER_ORIGIN = window.location.origin;
   var PICKER_WINDOW_NAME = "genesys-site-picker";
+  var appsUrl = "https://apps.usw2.pure.cloud";
 
   window.name = PICKER_WINDOW_NAME;
 
@@ -29,15 +30,16 @@
 
   function extractTokenFromValue(raw) {
     if (!raw) return null;
+    if (typeof raw === "string") {
+      var jwt = raw.match(/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+      if (jwt) return jwt[0];
+    }
     try {
       var parsed = JSON.parse(raw);
       return walkForToken(parsed);
     } catch (_e) {
-      if (typeof raw === "string" && raw.split(".").length === 3 && raw.length > 40) {
-        return raw;
-      }
+      return null;
     }
-    return null;
   }
 
   function walkForToken(obj) {
@@ -45,6 +47,7 @@
     if (typeof obj.accessToken === "string" && obj.accessToken.length > 20) return obj.accessToken;
     if (typeof obj.access_token === "string" && obj.access_token.length > 20) return obj.access_token;
     if (typeof obj.token === "string" && obj.token.length > 20) return obj.token;
+    if (typeof obj.value === "string" && obj.value.indexOf("eyJ") === 0) return obj.value;
     if (Array.isArray(obj)) {
       for (var i = 0; i < obj.length; i++) {
         var found = walkForToken(obj[i]);
@@ -60,16 +63,19 @@
     return null;
   }
 
-  function findGenesysAccessToken() {
-    var stores = [window.localStorage, window.sessionStorage];
-    for (var s = 0; s < stores.length; s++) {
-      var store = stores[s];
-      if (!store) continue;
-      for (var i = 0; i < store.length; i++) {
-        var token = extractTokenFromValue(store.getItem(store.key(i)));
-        if (token) return token;
+  function tokenFromSdkGlobals() {
+    try {
+      var clients = [
+        window.purecloud && window.purecloud.ApiClient && window.purecloud.ApiClient.instance,
+        window.platformClient && window.platformClient.ApiClient && window.platformClient.ApiClient.instance
+      ];
+      for (var i = 0; i < clients.length; i++) {
+        var inst = clients[i];
+        if (!inst || !inst.authentications) continue;
+        var auth = inst.authentications.accessToken || inst.authentications.AccessToken;
+        if (auth && auth.accessToken) return auth.accessToken;
       }
-    }
+    } catch (_e) {}
     return null;
   }
 
@@ -78,21 +84,29 @@
       "javascript:(function(){",
       "var ORIGIN=" + JSON.stringify(PICKER_ORIGIN) + ";",
       "var NAME=" + JSON.stringify(PICKER_WINDOW_NAME) + ";",
+      "var host=location.hostname||'';",
+      "var onGenesys=host.indexOf('pure.cloud')!==-1||host.indexOf('mypurecloud.com')!==-1;",
+      "if(!onGenesys){alert('Wrong tab. Open Genesys Cloud (apps.usw2.pure.cloud), then click this bookmark while you are on that tab. Or use Sign in with Genesys on the Site Picker page.');return;}",
       "function walk(o){if(!o||typeof o!=='object')return null;",
       "if(typeof o.accessToken==='string'&&o.accessToken.length>20)return o.accessToken;",
       "if(typeof o.access_token==='string'&&o.access_token.length>20)return o.access_token;",
       "if(typeof o.token==='string'&&o.token.length>20)return o.token;",
+      "if(typeof o.value==='string'&&o.value.indexOf('eyJ')===0)return o.value;",
       "if(Array.isArray(o)){for(var i=0;i<o.length;i++){var f=walk(o[i]);if(f)return f;}return null;}",
       "for(var k in o){if(Object.prototype.hasOwnProperty.call(o,k)){var n=walk(o[k]);if(n)return n;}}return null;}",
-      "function fromRaw(raw){if(!raw)return null;try{return walk(JSON.parse(raw));}catch(e){",
-      "if(typeof raw==='string'&&raw.split('.').length===3&&raw.length>40)return raw;}return null;}",
-      "function findToken(){var stores=[localStorage,sessionStorage];",
+      "function fromRaw(raw){if(!raw)return null;",
+      "var m=String(raw).match(/eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+/);",
+      "if(m)return m[0];try{return walk(JSON.parse(raw));}catch(e){}return null;}",
+      "function fromSdk(){try{var inst=(window.purecloud&&window.purecloud.ApiClient&&window.purecloud.ApiClient.instance)||(window.platformClient&&window.platformClient.ApiClient&&window.platformClient.ApiClient.instance);",
+      "if(inst&&inst.authentications){var a=inst.authentications.accessToken||inst.authentications.AccessToken;",
+      "if(a&&a.accessToken)return a.accessToken;}}catch(e){}return null;}",
+      "function findToken(){var t=fromSdk();if(t)return t;var stores=[localStorage,sessionStorage];",
       "for(var s=0;s<stores.length;s++){var store=stores[s];if(!store)continue;",
-      "for(var i=0;i<store.length;i++){var t=fromRaw(store.getItem(store.key(i)));if(t)return t;}}return null;}",
+      "for(var i=0;i<store.length;i++){t=fromRaw(store.getItem(store.key(i)));if(t)return t;}}return null;}",
       "var token=findToken();",
-      "if(!token){alert('No Genesys session token found on this tab. Sign in to Genesys Cloud first, or use Sign in with Genesys on the Site Picker page.');return;}",
+      "if(!token){alert('Could not read a Genesys session from this tab. Use Sign in with Genesys on the Site Picker page instead.');return;}",
       "var target=window.open('',NAME);",
-      "if(!target){alert('Open the Site Picker page first, then run this bookmarklet again.');return;}",
+      "if(!target){alert('Keep the Site Picker page open in another tab, then run this bookmark again on Genesys.');return;}",
       "target.postMessage({type:'genesys-token-bridge',access_token:token},ORIGIN);",
       "alert('Linked to Site Picker. Switch back to that tab.');",
       "})();"
@@ -123,6 +137,18 @@
   }
 
   function renderState(state) {
+    if (state && state.apps_url) {
+      appsUrl = state.apps_url;
+      var hostEl = $("genesys-host");
+      if (hostEl) {
+        try {
+          hostEl.textContent = new URL(appsUrl).host;
+        } catch (_e) {
+          hostEl.textContent = appsUrl;
+        }
+      }
+    }
+
     if (!state.authenticated) {
       showPanel("connect");
       return state;
@@ -217,6 +243,10 @@
     }
   }
 
+  function openGenesysCloud() {
+    window.open(appsUrl, "genesys-cloud", "noopener");
+  }
+
   function signOut() {
     fetch("oauth/logout", { method: "POST", credentials: "same-origin" })
       .then(function () { return loadState(); });
@@ -238,8 +268,20 @@
       .catch(function (err) { showResult("err", err.message || String(err)); });
   });
 
-  $("bookmarklet").href = buildBookmarkletHref();
+  var bookmarklet = $("bookmarklet");
+  bookmarklet.href = buildBookmarkletHref();
+  bookmarklet.addEventListener("click", function (event) {
+    event.preventDefault();
+    alert(
+      "Do not click this on the Site Picker page.\n\n" +
+      "Drag it to your bookmarks bar, open Genesys Cloud in another tab, " +
+      "then click the bookmark while you are on the Genesys tab.\n\n" +
+      "Or use Sign in with Genesys above — that is easier."
+    );
+  });
+
   $("btn-oauth").addEventListener("click", openOAuthPopup);
+  $("btn-open-genesys").addEventListener("click", openGenesysCloud);
   $("btn-change").addEventListener("click", changeSite);
   $("btn-refresh").addEventListener("click", loadState);
   $("btn-sign-out").addEventListener("click", signOut);
