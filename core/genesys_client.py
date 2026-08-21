@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional
 import requests
 
 from core.config import (
+    agent_credentials_from_env,
     get_api_host,
     get_client_credentials,
     get_login_host,
@@ -89,7 +90,14 @@ class GenesysClient:
             timeout=60,
         )
         if response.status_code >= 400:
-            raise GenesysError(f"OAuth failed: HTTP {response.status_code}: {response.text}")
+            detail = response.text[:500]
+            if "client_credential" in detail.lower() and agent_credentials_from_env()[0]:
+                raise GenesysError(
+                    "OAuth client_credentials grant failed. GENESYS_AGENT_* clients are "
+                    "authorization-code only. Set GENESYS_CLIENT_ID/SECRET from a Client "
+                    f"Credentials OAuth client. Genesys response: {detail}"
+                )
+            raise GenesysError(f"OAuth failed: HTTP {response.status_code}: {detail}")
         self.token = response.json()["access_token"]
         self.log("ok", f"Authenticated to {self.region} ({self.api_host})")
 

@@ -14,15 +14,15 @@ services:
         value: usw2
       - key: FLASK_SECRET_KEY
         sync: false
-      # OAuth client — Render demo uses GENESYS_AGENT_* (same client for sign-in + API)
-      - key: GENESYS_AGENT_CLIENT_ID
-        sync: false
-      - key: GENESYS_AGENT_CLIENT_SECRET
-        sync: false
-      # Optional local-style names (client.env); not required if AGENT_* are set
+      # Client Credentials OAuth client (Queue Performance, Not Responding, ops tools)
       - key: GENESYS_CLIENT_ID
         sync: false
       - key: GENESYS_CLIENT_SECRET
+        sync: false
+      # Authorization-code OAuth client (site-picker / agent sign-in — different grant)
+      - key: GENESYS_AGENT_CLIENT_ID
+        sync: false
+      - key: GENESYS_AGENT_CLIENT_SECRET
         sync: false
       # Optional: GENESYS_AGENT_USE_PKCE=0 if agent OAuth client has no secret
       # Register redirect: https://YOUR-SERVICE.onrender.com/site-picker/oauth/callback

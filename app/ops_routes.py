@@ -9,7 +9,7 @@ from app.queue_performance import fetch_queue_performance, parse_filters
 from app.tool_catalog import get_tool, tools_by_category
 from app.tool_runner import stream_tool_run
 from core.cli import create_client, tool_log
-from core.config import credentials_env_probe, credential_source, missing_admin_credentials_message, client_credentials_present
+from core.config import agent_credentials_present, credentials_env_probe, credential_source, missing_admin_credentials_message, client_credentials_present
 from core.demo_mode import is_demo_mode
 from core.genesys_client import safe_str
 from core.paths import OUTPUTS_DIR, PROJECT_ROOT, ensure_runtime_dirs

@@ -43,11 +43,12 @@ Best balance for a Flask demo: free tier, easy env vars, custom subdomain.
 - **Start command:** `gunicorn ops_app_demo:app --bind 0.0.0.0:$PORT --timeout 600`
 - **Environment variables** (Dashboard → Environment) — **no `client.env` file on Render**:
   - `OPS_DEMO_MODE=1`
-  - `GENESYS_AGENT_CLIENT_ID=...` (OAuth client — used for sign-in **and** server API calls)
-  - `GENESYS_AGENT_CLIENT_SECRET=...`
+  - `GENESYS_CLIENT_ID` / `GENESYS_CLIENT_SECRET` — **Client Credentials** OAuth client (Queue Performance, Not Responding, ops tools)
+  - `GENESYS_AGENT_CLIENT_ID` / `GENESYS_AGENT_CLIENT_SECRET` — **Authorization Code** OAuth client (site-picker sign-in only)
   - `GENESYS_REGION=usw2`
-  - `FLASK_SECRET_KEY=...` (random string — required for site picker sessions)
-  - Optional: `GENESYS_CLIENT_ID` / `GENESYS_CLIENT_SECRET` (local-style names; same values as agent vars if you prefer)
+  - `FLASK_SECRET_KEY=...` (random string — site picker sessions)
+
+These are usually **two different OAuth clients** in Genesys Admin. The agent client cannot substitute for the admin client.
 - Free tier sleeps after ~15 min idle (cold start ~30s on first visit)
 
 A starter spec is in `render.demo.yaml`.

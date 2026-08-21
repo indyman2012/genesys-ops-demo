@@ -19,8 +19,9 @@ REGION_ALIASES: dict[str, str] = {
 DEFAULT_REGION = "usw2"
 
 CREDENTIAL_ENV_HINT = (
-    "Set GENESYS_AGENT_CLIENT_ID and GENESYS_AGENT_CLIENT_SECRET on Render, or "
-    "GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET in client.env for local dev."
+    "Queue Performance and ops tools need GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET "
+    "from a Genesys OAuth client with the Client Credentials grant. "
+    "GENESYS_AGENT_* is authorization-code only (site-picker sign-in) and cannot substitute."
 )
 
 
@@ -34,21 +35,42 @@ def env_first(*names: str, default: str | None = None) -> str | None:
 
 _CREDENTIAL_PAIRS: tuple[tuple[str, str], ...] = (
     ("GENESYS_CLIENT_ID", "GENESYS_CLIENT_SECRET"),
-    ("GENESYS_AGENT_CLIENT_ID", "GENESYS_AGENT_CLIENT_SECRET"),
     ("PURECLOUD_CLIENT_ID", "PURECLOUD_CLIENT_SECRET"),
     ("CLIENT_ID", "CLIENT_SECRET"),
+)
+
+_AGENT_CREDENTIAL_PAIRS: tuple[tuple[str, str], ...] = (
+    ("GENESYS_AGENT_CLIENT_ID", "GENESYS_AGENT_CLIENT_SECRET"),
     ("AGENT_OAUTH_CLIENT_ID", "AGENT_OAUTH_CLIENT_SECRET"),
 )
 
 
 def client_credentials_from_env() -> tuple[str | None, str | None]:
-    """Resolve server-side OAuth client credentials from any supported env name."""
+    """OAuth pair for client_credentials grant (server/API tools).
+
+    Do not use GENESYS_AGENT_* here — agent OAuth clients are typically
+    authorization-code only (site-picker sign-in).
+    """
     for id_key, secret_key in _CREDENTIAL_PAIRS:
         client_id = env_first(id_key)
         client_secret = env_first(secret_key)
         if client_id and client_secret:
             return client_id, client_secret
     return None, None
+
+
+def agent_credentials_from_env() -> tuple[str | None, str | None]:
+    for id_key, secret_key in _AGENT_CREDENTIAL_PAIRS:
+        client_id = env_first(id_key)
+        client_secret = env_first(secret_key)
+        if client_id and client_secret:
+            return client_id, client_secret
+    return None, None
+
+
+def agent_credentials_present() -> bool:
+    client_id, client_secret = agent_credentials_from_env()
+    return bool(client_id and client_secret)
 
 
 def credential_source() -> str:
@@ -79,10 +101,15 @@ def credentials_env_probe() -> dict[str, bool]:
 def missing_admin_credentials_message() -> str:
     if client_credentials_present():
         return ""
+    if agent_credentials_present():
+        return (
+            "GENESYS_AGENT_CLIENT_ID/SECRET are set (authorization-code sign-in) but "
+            "GENESYS_CLIENT_ID/SECRET are missing. Add a separate Client Credentials "
+            "OAuth client on Render for Queue Performance and ops API calls."
+        )
     return (
-        "Missing OAuth client credentials. Set GENESYS_AGENT_CLIENT_ID and "
-        "GENESYS_AGENT_CLIENT_SECRET on Render (or GENESYS_CLIENT_ID / "
-        "GENESYS_CLIENT_SECRET in client.env for local dev)."
+        "Missing GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET for client-credentials API access. "
+        + CREDENTIAL_ENV_HINT
     )
 
 
