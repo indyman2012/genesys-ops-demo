@@ -378,7 +378,7 @@ def api_change_site():
         if site_id not in allowed:
             return jsonify({"error": "You do not have permission for that site."}), 403
 
-        change_phone_site(token, phone_id=phone_id, site_id=site_id)
+        change_phone_site(token, phone_id=phone_id, site_id=site_id, user_id=user_id)
         sites_by_id = {
             str(s.get("id")): s
             for s in fetch_sites_with_user_token(token)

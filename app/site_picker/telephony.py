@@ -62,6 +62,7 @@ def _try_user_request(
     *,
     params: dict[str, Any] | None = None,
     json_body: Any = None,
+    retry_statuses: tuple[int, ...] = (403, 404),
 ) -> Any | None:
     try:
         return _user_request(
@@ -73,9 +74,24 @@ def _try_user_request(
         )
     except GenesysError as exc:
         message = str(exc)
-        if "HTTP 403" in message or "HTTP 404" in message:
+        if any(f"HTTP {code}" in message for code in retry_statuses):
             return None
         raise
+
+
+def _try_put_phone(
+    access_token: str,
+    phone_id: str,
+    payload: dict[str, Any],
+) -> Any | None:
+    # Genesys rejects site-only payloads (400: phone must contain at least one line).
+    return _try_user_request(
+        access_token,
+        "PUT",
+        f"/api/v2/telephony/providers/edges/phones/{phone_id}",
+        json_body=payload,
+        retry_statuses=(400, 403, 404),
+    )
 
 
 def _pick_user_station(payload: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -295,7 +311,48 @@ def get_phone_detail(access_token: str, phone_id: str) -> dict[str, Any] | None:
     return _fetch_phone_by_id(access_token, phone_id)
 
 
-SITE_PICKER_BUILD = "2026-06-29-agent-phone-change-v3"
+def _fetch_phone_from_user_list(
+    access_token: str,
+    *,
+    user_id: str,
+    phone_id: str,
+) -> dict[str, Any] | None:
+    payload = _try_user_request(
+        access_token,
+        "GET",
+        "/api/v2/telephony/providers/edges/phones",
+        params={
+            "webRtcUser.id": user_id,
+            "expand": "site",
+            "pageSize": 25,
+            "pageNumber": 1,
+        },
+    )
+    for phone in (payload or {}).get("entities") or []:
+        if safe_str(phone.get("id")) == phone_id and phone.get("lines"):
+            return phone
+    return None
+
+
+def _fetch_phone_for_update(
+    access_token: str,
+    *,
+    phone_id: str,
+    user_id: str = "",
+) -> dict[str, Any] | None:
+    phone = get_phone_detail(access_token, phone_id)
+    if phone and phone.get("lines"):
+        return phone
+    if user_id:
+        return _fetch_phone_from_user_list(
+            access_token,
+            user_id=user_id,
+            phone_id=phone_id,
+        )
+    return phone if phone and phone.get("lines") else None
+
+
+SITE_PICKER_BUILD = "2026-06-29-agent-phone-change-v4"
 
 
 def _admin_credentials_available() -> bool:
@@ -340,34 +397,18 @@ def change_phone_site(
     *,
     phone_id: str,
     site_id: str,
+    user_id: str = "",
 ) -> dict[str, Any]:
     target_site = resolve_site(access_token, site_id)
-    minimal_payload = {
-        "site": {
-            "id": target_site["id"],
-            "name": target_site.get("name"),
-        }
-    }
 
-    # Agents with phone assign (but not view) can often update site with a minimal PUT.
-    result = _try_user_request(
+    phone = _fetch_phone_for_update(
         access_token,
-        "PUT",
-        f"/api/v2/telephony/providers/edges/phones/{phone_id}",
-        json_body=minimal_payload,
+        phone_id=phone_id,
+        user_id=user_id,
     )
-    if result is not None:
-        return result or {}
-
-    phone = get_phone_detail(access_token, phone_id)
     if phone:
         full_payload = build_phone_update_payload(phone, target_site)
-        result = _try_user_request(
-            access_token,
-            "PUT",
-            f"/api/v2/telephony/providers/edges/phones/{phone_id}",
-            json_body=full_payload,
-        )
+        result = _try_put_phone(access_token, phone_id, full_payload)
         if result is not None:
             return result or {}
 
