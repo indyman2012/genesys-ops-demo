@@ -83,7 +83,7 @@
         <div class="target-block">
           <div class="target-title">Targets (for color coding)</div>
           <label>Service level % <input type="number" step="1" name="target_service_level_pct" id="target-sl" value="80"></label>
-          <label>ASA (sec) <input type="number" step="1" name="target_asa" id="target-asa" value="30"></label>
+          <label>ASA (sec) <input type="number" step="1" name="target_asa" id="target-asa" value="40"></label>
           <label>AHT / talk (sec) <input type="number" step="1" name="target_aht" id="target-aht" value="360"></label>
           <label>ACW (sec) <input type="number" step="1" name="target_acw" id="target-acw" value="45"></label>
           <label>Abandon % <input type="number" step="0.1" name="target_abandon_pct" id="target-abandon" value="5"></label>
@@ -95,6 +95,7 @@
         <div><span class="pill green">Green</span> At or better than target</div>
         <div><span class="pill yellow">Yellow</span> Moderately off target</div>
         <div><span class="pill red">Red</span> Needs attention</div>
+        <p class="legend-note">ASA: ≤25s green · ≤60s yellow · &gt;60s red (target 40s)</p>
       </div>
     </aside>
 
