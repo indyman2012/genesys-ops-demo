@@ -1,16 +1,24 @@
 (function () {
   const form = document.getElementById("filter-form");
   const rowsEl = document.getElementById("queue-rows");
+  const agentRowsEl = document.getElementById("agent-rows");
   const errorBanner = document.getElementById("error-banner");
   const refreshBtn = document.getElementById("btn-refresh");
+  const backBtn = document.getElementById("btn-back");
   const divisionSelect = document.getElementById("division-select");
   const daysSelect = document.getElementById("days-select");
   const startDateInput = document.getElementById("start-date");
   const endDateInput = document.getElementById("end-date");
+  const overviewEl = document.getElementById("qp-overview");
+  const detailEl = document.getElementById("qp-detail");
 
   let volumeChart = null;
   let perfChart = null;
+  let detailVolumeChart = null;
+  let detailPerfChart = null;
   let loading = false;
+  let selectedQueueId = null;
+  let selectedQueueName = "";
 
   function escapeHtml(value) {
     return String(value)
@@ -43,13 +51,6 @@
   function formatSec(value) {
     if (value == null || value === "") return "—";
     return Number(value).toFixed(1) + "s";
-  }
-
-  function statusClass(status) {
-    if (status === "metric-good") return "green";
-    if (status === "metric-warning") return "yellow";
-    if (status === "metric-bad") return "red";
-    return "na";
   }
 
   function metricCell(value, status, formatter) {
@@ -91,6 +92,29 @@
     document.getElementById("summary-asa").textContent = formatSec(summary.asa_sec);
   }
 
+  function renderMetricRowCells(row, primaryKey, secondaryKey) {
+    const statuses = row.statuses || {};
+    const overall = row.overall_status || "green";
+    let html =
+      '<td><span class="pill ' + escapeHtml(overall) + '">' + escapeHtml(overall.toUpperCase()) + "</span></td>" +
+      "<td>" + escapeHtml(row[primaryKey] || "") + "</td>";
+    if (secondaryKey) {
+      html += "<td>" + escapeHtml(row[secondaryKey] || "—") + "</td>";
+    }
+    html +=
+      metricCell(row.offered, "metric-na", formatNumber) +
+      metricCell(row.answered, "metric-na", formatNumber) +
+      metricCell(row.abandoned, "metric-na", formatNumber) +
+      metricCell(row.abandon_pct, statuses.abandon_pct, formatPct) +
+      metricCell(row.service_level_pct, statuses.service_level_pct, formatPct) +
+      metricCell(row.asa_sec, statuses.asa, formatSec) +
+      metricCell(row.avg_talk_sec, statuses.aht, formatSec) +
+      metricCell(row.avg_hold_sec, "metric-na", formatSec) +
+      metricCell(row.avg_acw_sec, statuses.acw, formatSec) +
+      metricCell(row.avg_handle_sec, "metric-na", formatSec);
+    return html;
+  }
+
   function renderQueues(queues) {
     if (!queues.length) {
       rowsEl.innerHTML =
@@ -100,25 +124,29 @@
 
     rowsEl.innerHTML = queues
       .map(function (queue) {
-        const statuses = queue.statuses || {};
-        const overall = queue.overall_status || "green";
         return (
-          "<tr>" +
-          '<td><span class="pill ' + escapeHtml(overall) + '">' + escapeHtml(overall.toUpperCase()) + "</span></td>" +
-          "<td>" + escapeHtml(queue.queue_name || "") + "</td>" +
-          "<td>" + escapeHtml(queue.division_name || "—") + "</td>" +
-          metricCell(queue.offered, "metric-na", formatNumber) +
-          metricCell(queue.answered, "metric-na", formatNumber) +
-          metricCell(queue.abandoned, "metric-na", formatNumber) +
-          metricCell(queue.abandon_pct, statuses.abandon_pct, formatPct) +
-          metricCell(queue.service_level_pct, statuses.service_level_pct, formatPct) +
-          metricCell(queue.asa_sec, statuses.asa, formatSec) +
-          metricCell(queue.avg_talk_sec, statuses.aht, formatSec) +
-          metricCell(queue.avg_hold_sec, "metric-na", formatSec) +
-          metricCell(queue.avg_acw_sec, statuses.acw, formatSec) +
-          metricCell(queue.avg_handle_sec, "metric-na", formatSec) +
+          '<tr class="queue-row" tabindex="0" role="button" data-queue-id="' +
+          escapeHtml(queue.queue_id || "") +
+          '" data-queue-name="' +
+          escapeHtml(queue.queue_name || "") +
+          '" title="Click to view queue detail">' +
+          renderMetricRowCells(queue, "queue_name", "division_name") +
           "</tr>"
         );
+      })
+      .join("");
+  }
+
+  function renderAgents(agents) {
+    if (!agents.length) {
+      agentRowsEl.innerHTML =
+        '<tr class="empty-row"><td colspan="12">No agent activity on this queue for the selected window.</td></tr>';
+      return;
+    }
+
+    agentRowsEl.innerHTML = agents
+      .map(function (agent) {
+        return "<tr>" + renderMetricRowCells(agent, "user_name", null) + "</tr>";
       })
       .join("");
   }
@@ -128,19 +156,18 @@
     return null;
   }
 
-  function renderCharts(trend) {
+  function renderCharts(trend, volumeCanvasId, perfCanvasId) {
+    const volumeCanvas = document.getElementById(volumeCanvasId);
+    const perfCanvas = document.getElementById(perfCanvasId);
     const labels = (trend || []).map(function (row) { return row.date; });
-    const offered = trend.map(function (row) { return row.offered || 0; });
-    const answered = trend.map(function (row) { return row.answered || 0; });
-    const abandoned = trend.map(function (row) { return row.abandoned || 0; });
-    const serviceLevel = trend.map(function (row) { return row.service_level_pct; });
-    const abandonPct = trend.map(function (row) { return row.abandon_pct; });
-    const asa = trend.map(function (row) { return row.asa_sec; });
+    const offered = (trend || []).map(function (row) { return row.offered || 0; });
+    const answered = (trend || []).map(function (row) { return row.answered || 0; });
+    const abandoned = (trend || []).map(function (row) { return row.abandoned || 0; });
+    const serviceLevel = (trend || []).map(function (row) { return row.service_level_pct; });
+    const abandonPct = (trend || []).map(function (row) { return row.abandon_pct; });
+    const asa = (trend || []).map(function (row) { return row.asa_sec; });
 
-    volumeChart = destroyChart(volumeChart);
-    perfChart = destroyChart(perfChart);
-
-    volumeChart = new Chart(document.getElementById("volume-chart"), {
+    const nextVolume = new Chart(volumeCanvas, {
       type: "line",
       data: {
         labels: labels,
@@ -158,7 +185,7 @@
       },
     });
 
-    perfChart = new Chart(document.getElementById("perf-chart"), {
+    const nextPerf = new Chart(perfCanvas, {
       type: "line",
       data: {
         labels: labels,
@@ -178,6 +205,8 @@
         },
       },
     });
+
+    return { volume: nextVolume, perf: nextPerf };
   }
 
   function applyFiltersToForm(filters) {
@@ -190,6 +219,79 @@
     if (filters.target_aht != null) document.getElementById("target-aht").value = filters.target_aht;
     if (filters.target_acw != null) document.getElementById("target-acw").value = filters.target_acw;
     if (filters.target_abandon_pct != null) document.getElementById("target-abandon").value = filters.target_abandon_pct;
+  }
+
+  function showOverview() {
+    selectedQueueId = null;
+    selectedQueueName = "";
+    overviewEl.classList.remove("hidden");
+    detailEl.classList.add("hidden");
+    document.getElementById("page-subtitle").textContent =
+      "Inbound voice queue metrics with health color coding — click a queue to drill down by agent.";
+    if (history.state && history.state.view === "detail") {
+      history.pushState({ view: "overview" }, "", window.location.pathname + window.location.search);
+    }
+  }
+
+  function showDetailView(queueId, queueName) {
+    selectedQueueId = queueId;
+    selectedQueueName = queueName || "Queue detail";
+    overviewEl.classList.add("hidden");
+    detailEl.classList.remove("hidden");
+    document.getElementById("page-subtitle").textContent =
+      "Queue drill-down — trends and per-agent metrics for the selected date range.";
+    document.getElementById("detail-queue-name").textContent = selectedQueueName;
+    history.pushState({ view: "detail", queueId: queueId }, "", window.location.pathname + window.location.search);
+  }
+
+  function renderDetailSummary(queue, agentCount) {
+    document.getElementById("detail-agent-count").textContent = formatNumber(agentCount);
+    document.getElementById("detail-offered").textContent = formatNumber(queue.offered);
+    document.getElementById("detail-sl").textContent = formatPct(queue.service_level_pct);
+    document.getElementById("detail-abandon").textContent = formatPct(queue.abandon_pct);
+    document.getElementById("detail-asa").textContent = formatSec(queue.asa_sec);
+    const overall = queue.overall_status || "green";
+    document.getElementById("detail-health").innerHTML =
+      '<span class="pill ' + escapeHtml(overall) + '">' + escapeHtml(overall.toUpperCase()) + "</span>";
+    const division = queue.division_name ? " · " + queue.division_name : "";
+    document.getElementById("detail-queue-meta").textContent =
+      (queue.offered != null ? formatNumber(queue.offered) + " offered" : "") + division;
+  }
+
+  async function loadQueueDetail(queueId, queueName) {
+    if (loading) return;
+    loading = true;
+    setError("");
+    showDetailView(queueId, queueName);
+    agentRowsEl.innerHTML = '<tr class="empty-row"><td colspan="12">Loading agents…</td></tr>';
+
+    try {
+      const response = await fetch(
+        "/api/queue-performance/queues/" + encodeURIComponent(queueId) + "?" + buildQuery(),
+        { headers: { Accept: "application/json" } }
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to load queue detail.");
+      }
+
+      applyFiltersToForm(payload.filters);
+      const queue = payload.queue || {};
+      document.getElementById("detail-queue-name").textContent = queue.queue_name || queueName;
+      renderDetailSummary(queue, payload.agent_count || 0);
+      renderAgents(payload.agents || []);
+      detailVolumeChart = destroyChart(detailVolumeChart);
+      detailPerfChart = destroyChart(detailPerfChart);
+      const detailCharts = renderCharts(payload.trend || [], "detail-volume-chart", "detail-perf-chart");
+      detailVolumeChart = detailCharts.volume;
+      detailPerfChart = detailCharts.perf;
+      document.getElementById("last-updated").textContent = new Date().toLocaleString();
+    } catch (err) {
+      setError(err.message || String(err));
+      agentRowsEl.innerHTML = '<tr class="empty-row"><td colspan="12">Unable to load queue detail.</td></tr>';
+    } finally {
+      loading = false;
+    }
   }
 
   async function loadData() {
@@ -212,8 +314,23 @@
       document.getElementById("queue-count").textContent = formatNumber(payload.queue_count);
       renderSummary(payload.summary || {}, payload.queue_count);
       renderQueues(payload.queues || []);
-      renderCharts(payload.trend || []);
+      volumeChart = destroyChart(volumeChart);
+      perfChart = destroyChart(perfChart);
+      const charts = renderCharts(payload.trend || [], "volume-chart", "perf-chart");
+      volumeChart = charts.volume;
+      perfChart = charts.perf;
       document.getElementById("last-updated").textContent = new Date().toLocaleString();
+
+      if (selectedQueueId) {
+        const stillVisible = (payload.queues || []).some(function (q) {
+          return q.queue_id === selectedQueueId;
+        });
+        if (stillVisible) {
+          await loadQueueDetail(selectedQueueId, selectedQueueName);
+        } else {
+          showOverview();
+        }
+      }
     } catch (err) {
       setError(err.message || String(err));
       rowsEl.innerHTML = '<tr class="empty-row"><td colspan="13">Unable to load data.</td></tr>';
@@ -222,9 +339,31 @@
     }
   }
 
+  rowsEl.addEventListener("click", function (event) {
+    const row = event.target.closest(".queue-row");
+    if (!row) return;
+    const queueId = row.getAttribute("data-queue-id");
+    if (!queueId) return;
+    loadQueueDetail(queueId, row.getAttribute("data-queue-name") || "");
+  });
+
+  rowsEl.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const row = event.target.closest(".queue-row");
+    if (!row) return;
+    event.preventDefault();
+    const queueId = row.getAttribute("data-queue-id");
+    if (!queueId) return;
+    loadQueueDetail(queueId, row.getAttribute("data-queue-name") || "");
+  });
+
   form.addEventListener("submit", function (event) {
     event.preventDefault();
-    loadData();
+    if (selectedQueueId) {
+      loadQueueDetail(selectedQueueId, selectedQueueName);
+    } else {
+      loadData();
+    }
   });
 
   daysSelect.addEventListener("change", function () {
@@ -234,7 +373,23 @@
     }
   });
 
-  refreshBtn.addEventListener("click", loadData);
+  refreshBtn.addEventListener("click", function () {
+    if (selectedQueueId) {
+      loadQueueDetail(selectedQueueId, selectedQueueName);
+    } else {
+      loadData();
+    }
+  });
+
+  backBtn.addEventListener("click", showOverview);
+
+  window.addEventListener("popstate", function () {
+    if (history.state && history.state.view === "detail" && history.state.queueId) {
+      loadQueueDetail(history.state.queueId, selectedQueueName);
+    } else {
+      showOverview();
+    }
+  });
 
   loadData();
 })();

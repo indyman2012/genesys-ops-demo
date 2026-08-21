@@ -287,6 +287,202 @@ def enrich_queue_row(
     }
 
 
+def inbound_voice_filter(queue_id: str | None = None) -> dict[str, Any]:
+    predicates: list[dict[str, Any]] = [
+        {
+            "type": "dimension",
+            "dimension": "direction",
+            "operator": "matches",
+            "value": "inbound",
+        },
+        {
+            "type": "dimension",
+            "dimension": "mediaType",
+            "operator": "matches",
+            "value": "voice",
+        },
+    ]
+    if queue_id:
+        predicates.append(
+            {
+                "type": "dimension",
+                "dimension": "queueId",
+                "operator": "matches",
+                "value": queue_id,
+            }
+        )
+    return {"type": "and", "predicates": predicates}
+
+
+def query_conversation_aggregates(
+    client,
+    *,
+    interval: str,
+    group_by: list[str],
+    queue_id: str | None = None,
+    granularity: str = "P1D",
+) -> dict[str, Any]:
+    body = {
+        "interval": interval,
+        "granularity": granularity,
+        "groupBy": group_by,
+        "filter": inbound_voice_filter(queue_id),
+        "metrics": list(AGGREGATE_METRICS),
+    }
+    return client.request(
+        "POST",
+        "/api/v2/analytics/conversations/aggregates/query",
+        json_body=body,
+    )
+
+
+def load_user_names(client, user_ids: set[str]) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for uid in sorted(user_ids):
+        try:
+            user = client.request("GET", f"/api/v2/users/{uid}")
+            names[uid] = safe_str(user.get("name")) or uid
+        except Exception:
+            names[uid] = uid
+    return names
+
+
+def enrich_agent_row(
+    user_id: str,
+    user_name: str,
+    metrics: dict[str, Any],
+    filters: dict[str, Any],
+) -> dict[str, Any]:
+    row = enrich_queue_row(
+        {"id": user_id, "name": user_name, "division_name": ""},
+        metrics,
+        filters,
+    )
+    return {
+        "user_id": user_id,
+        "user_name": user_name,
+        **{key: row[key] for key in row if key not in {"queue_id", "queue_name", "division_name"}},
+    }
+
+
+def build_daily_trend(
+    start_date: date,
+    end_date: date,
+    per_day: dict[str, MetricAccumulator],
+) -> list[dict[str, Any]]:
+    trend: list[dict[str, Any]] = []
+    cursor = start_date
+    while cursor <= end_date:
+        key = cursor.isoformat()
+        day_metrics = per_day.get(key, MetricAccumulator()).to_metrics()
+        trend.append({"date": key, **day_metrics})
+        cursor += timedelta(days=1)
+    return trend
+
+
+def absorb_aggregate_results(
+    resp: dict[str, Any],
+    *,
+    group_key: str,
+    per_group: dict[str, MetricAccumulator],
+    per_day: dict[str, MetricAccumulator] | None = None,
+    allowed_ids: set[str] | None = None,
+) -> None:
+    for result in resp.get("results") or []:
+        group = result.get("group") if isinstance(result.get("group"), dict) else {}
+        entity_id = safe_str(group.get(group_key))
+        if allowed_ids is not None and entity_id not in allowed_ids:
+            continue
+        if not entity_id and group_key:
+            continue
+        bucket_target = per_group.setdefault(entity_id or "__all__", MetricAccumulator())
+        for data_bucket in result.get("data") or []:
+            parsed = bucket_metrics(data_bucket)
+            if not parsed:
+                continue
+            bucket_target.absorb(parsed)
+            if per_day is not None:
+                per_day[day_key(data_bucket.get("interval") or "")].absorb(parsed)
+
+
+def fetch_queue_detail(
+    client,
+    queue_id: str,
+    filters: dict[str, Any],
+) -> dict[str, Any]:
+    queue_catalog, _divisions = load_queue_catalog(client)
+    queue_meta = queue_catalog.get(queue_id)
+    if not queue_meta:
+        raise ValueError(f"Unknown queue id: {queue_id}")
+
+    start_date = date.fromisoformat(filters["start_date"])
+    end_date = date.fromisoformat(filters["end_date"])
+    interval = api_interval(start_date, end_date)
+
+    queue_resp = query_conversation_aggregates(
+        client,
+        interval=interval,
+        group_by=["queueId"],
+        queue_id=queue_id,
+        granularity="P1D",
+    )
+    per_day: dict[str, MetricAccumulator] = defaultdict(MetricAccumulator)
+    per_queue: dict[str, MetricAccumulator] = defaultdict(MetricAccumulator)
+    absorb_aggregate_results(
+        queue_resp,
+        group_key="queueId",
+        per_group=per_queue,
+        per_day=per_day,
+        allowed_ids={queue_id},
+    )
+
+    agent_resp = query_conversation_aggregates(
+        client,
+        interval=interval,
+        group_by=["userId"],
+        queue_id=queue_id,
+        granularity="P1D",
+    )
+    per_agent: dict[str, MetricAccumulator] = defaultdict(MetricAccumulator)
+    absorb_aggregate_results(
+        agent_resp,
+        group_key="userId",
+        per_group=per_agent,
+    )
+
+    queue_acc = per_queue.get(queue_id) or MetricAccumulator()
+    summary = enrich_queue_row(queue_meta, queue_acc.to_metrics(), filters)
+    trend = build_daily_trend(start_date, end_date, per_day)
+
+    agent_rows: list[dict[str, Any]] = []
+    user_ids = {uid for uid, acc in per_agent.items() if acc.offered > 0 or acc.answered > 0}
+    user_names = load_user_names(client, user_ids)
+    for user_id, acc in per_agent.items():
+        if acc.offered <= 0 and acc.answered <= 0:
+            continue
+        agent_rows.append(
+            enrich_agent_row(
+                user_id,
+                user_names.get(user_id, user_id),
+                acc.to_metrics(),
+                filters,
+            )
+        )
+    agent_rows.sort(
+        key=lambda row: (-(row.get("offered") or 0), row.get("user_name") or ""),
+    )
+
+    return {
+        "filters": filters,
+        "interval": interval,
+        "queue": summary,
+        "trend": trend,
+        "agents": agent_rows,
+        "agent_count": len(agent_rows),
+        "metric_thresholds": METRIC_THRESHOLDS,
+    }
+
+
 def fetch_queue_performance(client, filters: dict[str, Any]) -> dict[str, Any]:
     start_date = date.fromisoformat(filters["start_date"])
     end_date = date.fromisoformat(filters["end_date"])
@@ -303,33 +499,10 @@ def fetch_queue_performance(client, filters: dict[str, Any]) -> dict[str, Any]:
         )
     }
 
-    body = {
-        "interval": interval,
-        "granularity": "P1D",
-        "groupBy": ["queueId"],
-        "filter": {
-            "type": "and",
-            "predicates": [
-                {
-                    "type": "dimension",
-                    "dimension": "direction",
-                    "operator": "matches",
-                    "value": "inbound",
-                },
-                {
-                    "type": "dimension",
-                    "dimension": "mediaType",
-                    "operator": "matches",
-                    "value": "voice",
-                },
-            ],
-        },
-        "metrics": list(AGGREGATE_METRICS),
-    }
-    resp = client.request(
-        "POST",
-        "/api/v2/analytics/conversations/aggregates/query",
-        json_body=body,
+    resp = query_conversation_aggregates(
+        client,
+        interval=interval,
+        group_by=["queueId"],
     )
 
     per_queue: dict[str, MetricAccumulator] = defaultdict(MetricAccumulator)

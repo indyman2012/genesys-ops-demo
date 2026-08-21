@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
@@ -27,7 +27,7 @@
 
   <header class="topbar">
     <div class="topbar-left">
-      <p class="page-subtitle">Inbound voice queue metrics with health color coding — same data as Genesys Queue Performance, reorganized for faster scanning.</p>
+      <p class="page-subtitle" id="page-subtitle">Inbound voice queue metrics with health color coding — click a queue to drill down by agent.</p>
     </div>
     <div class="brand">
       <img
@@ -102,83 +102,168 @@
     <section class="qp-main">
       <p id="error-banner" class="error-banner hidden"></p>
 
-      <section class="qp-status">
-        <div class="status-card">
-          <span class="status-label">Queues in view</span>
-          <span id="queue-count" class="status-value">—</span>
-        </div>
-        <div class="status-card">
-          <span class="status-label">Offered</span>
-          <span id="summary-offered" class="status-value">—</span>
-        </div>
-        <div class="status-card">
-          <span class="status-label">Service level</span>
-          <span id="summary-sl" class="status-value">—</span>
-        </div>
-        <div class="status-card">
-          <span class="status-label">Abandon %</span>
-          <span id="summary-abandon" class="status-value">—</span>
-        </div>
-        <div class="status-card">
-          <span class="status-label">ASA</span>
-          <span id="summary-asa" class="status-value">—</span>
-        </div>
-        <div class="status-card">
-          <span class="status-label">Last updated</span>
-          <span id="last-updated" class="status-value small">—</span>
-        </div>
-      </section>
+      <div id="qp-overview">
+        <section class="qp-status">
+          <div class="status-card">
+            <span class="status-label">Queues in view</span>
+            <span id="queue-count" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Offered</span>
+            <span id="summary-offered" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Service level</span>
+            <span id="summary-sl" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Abandon %</span>
+            <span id="summary-abandon" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">ASA</span>
+            <span id="summary-asa" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Last updated</span>
+            <span id="last-updated" class="status-value small">—</span>
+          </div>
+        </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Volume trend</h2>
-          <p>Daily offered vs answered vs abandoned</p>
-        </div>
-        <div class="chart-wrap"><canvas id="volume-chart"></canvas></div>
-      </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Volume trend</h2>
+            <p>Daily offered vs answered vs abandoned (all filtered queues)</p>
+          </div>
+          <div class="chart-wrap"><canvas id="volume-chart"></canvas></div>
+        </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Performance trend</h2>
-          <p>Service level, abandon rate, and ASA over time</p>
-        </div>
-        <div class="chart-wrap"><canvas id="perf-chart"></canvas></div>
-      </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Performance trend</h2>
+            <p>Service level, abandon rate, and ASA over time</p>
+          </div>
+          <div class="chart-wrap"><canvas id="perf-chart"></canvas></div>
+        </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Queue scorecard</h2>
-          <p>Sorted by health (needs attention first), then volume. Cells are color-coded against your targets.</p>
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Queue scorecard</h2>
+            <p>Sorted by health (needs attention first), then volume. Click a row to drill down.</p>
+          </div>
+          <div class="table-wrap">
+            <table class="qp-table">
+              <thead>
+                <tr>
+                  <th>Health</th>
+                  <th>Queue</th>
+                  <th>Division</th>
+                  <th class="num">Offered</th>
+                  <th class="num">Answered</th>
+                  <th class="num">Abandoned</th>
+                  <th class="num">Abandon %</th>
+                  <th class="num">Service level</th>
+                  <th class="num">ASA</th>
+                  <th class="num">Talk</th>
+                  <th class="num">Hold</th>
+                  <th class="num">ACW</th>
+                  <th class="num">Handle</th>
+                </tr>
+              </thead>
+              <tbody id="queue-rows">
+                <tr class="empty-row"><td colspan="13">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div id="qp-detail" class="hidden">
+        <div class="detail-toolbar">
+          <button type="button" id="btn-back" class="btn btn-secondary">← All queues</button>
+          <div>
+            <h2 id="detail-queue-name">Queue detail</h2>
+            <p id="detail-queue-meta" class="detail-meta"></p>
+          </div>
         </div>
-        <div class="table-wrap">
-          <table class="qp-table">
-            <thead>
-              <tr>
-                <th>Health</th>
-                <th>Queue</th>
-                <th>Division</th>
-                <th class="num">Offered</th>
-                <th class="num">Answered</th>
-                <th class="num">Abandoned</th>
-                <th class="num">Abandon %</th>
-                <th class="num">Service level</th>
-                <th class="num">ASA</th>
-                <th class="num">Talk</th>
-                <th class="num">Hold</th>
-                <th class="num">ACW</th>
-                <th class="num">Handle</th>
-              </tr>
-            </thead>
-            <tbody id="queue-rows">
-              <tr class="empty-row"><td colspan="13">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+
+        <section class="qp-status">
+          <div class="status-card">
+            <span class="status-label">Agents</span>
+            <span id="detail-agent-count" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Offered</span>
+            <span id="detail-offered" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Service level</span>
+            <span id="detail-sl" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Abandon %</span>
+            <span id="detail-abandon" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">ASA</span>
+            <span id="detail-asa" class="status-value">—</span>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Health</span>
+            <span id="detail-health" class="status-value small">—</span>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Queue volume trend</h2>
+            <p>Daily offered vs answered vs abandoned for this queue</p>
+          </div>
+          <div class="chart-wrap"><canvas id="detail-volume-chart"></canvas></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Queue performance trend</h2>
+            <p>Service level, abandon rate, and ASA for this queue</p>
+          </div>
+          <div class="chart-wrap"><canvas id="detail-perf-chart"></canvas></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Agent scorecard</h2>
+            <p>Inbound voice handled on this queue during the selected window.</p>
+          </div>
+          <div class="table-wrap">
+            <table class="qp-table">
+              <thead>
+                <tr>
+                  <th>Health</th>
+                  <th>Agent</th>
+                  <th class="num">Offered</th>
+                  <th class="num">Answered</th>
+                  <th class="num">Abandoned</th>
+                  <th class="num">Abandon %</th>
+                  <th class="num">Service level</th>
+                  <th class="num">ASA</th>
+                  <th class="num">Talk</th>
+                  <th class="num">Hold</th>
+                  <th class="num">ACW</th>
+                  <th class="num">Handle</th>
+                </tr>
+              </thead>
+              <tbody id="agent-rows">
+                <tr class="empty-row"><td colspan="12">Select a queue to load agents.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </section>
   </main>
   </div>
 
-  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=1"></script>
+  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=2"></script>
 </body>
 </html>

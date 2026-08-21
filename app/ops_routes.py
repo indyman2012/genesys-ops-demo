@@ -5,7 +5,7 @@ import os
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
 from app.not_responding import fetch_not_responding_agents
-from app.queue_performance import fetch_queue_performance, parse_filters
+from app.queue_performance import fetch_queue_detail, fetch_queue_performance, parse_filters
 from app.tool_catalog import get_tool, tools_by_category
 from app.tool_runner import stream_tool_run
 from core.cli import create_client, tool_log
@@ -56,6 +56,22 @@ def queue_performance_api():
         return jsonify(payload), 500
 
 
+@ops_bp.route("/api/queue-performance/queues/<queue_id>")
+def queue_performance_detail_api(queue_id: str):
+    try:
+        client = create_client(log=tool_log)
+        filters = parse_filters(request.args)
+        return jsonify(fetch_queue_detail(client, queue_id, filters))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        probe = credentials_env_probe()
+        payload = {"error": str(exc), "env_probe": probe}
+        if not probe.get("GENESYS_CLIENT_ID") or not probe.get("GENESYS_CLIENT_SECRET"):
+            payload["missing_env"] = missing_admin_credentials_message()
+        return jsonify(payload), 500
+
+
 @ops_bp.route("/api/not-responding")
 def not_responding_api():
     try:
@@ -80,6 +96,7 @@ def health():
             "env_probe": probe,
             "credential_source": credential_source(),
             "admin_credentials_set": probe.get("GENESYS_CLIENT_ID") and probe.get("GENESYS_CLIENT_SECRET"),
+            "agent_credentials_set": agent_credentials_present(),
         })
     except Exception as exc:
         return jsonify({
@@ -88,6 +105,7 @@ def health():
             "env_probe": probe,
             "credential_source": credential_source(),
             "admin_credentials_set": bool(probe.get("GENESYS_CLIENT_ID") and probe.get("GENESYS_CLIENT_SECRET")),
+            "agent_credentials_set": agent_credentials_present(),
             "credentials_ready": client_credentials_present(),
             "missing_env": missing_admin_credentials_message(),
         }), 500
