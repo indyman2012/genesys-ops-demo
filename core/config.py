@@ -32,32 +32,29 @@ def env_first(*names: str, default: str | None = None) -> str | None:
     return default
 
 
+_CREDENTIAL_PAIRS: tuple[tuple[str, str], ...] = (
+    ("GENESYS_CLIENT_ID", "GENESYS_CLIENT_SECRET"),
+    ("GENESYS_AGENT_CLIENT_ID", "GENESYS_AGENT_CLIENT_SECRET"),
+    ("PURECLOUD_CLIENT_ID", "PURECLOUD_CLIENT_SECRET"),
+    ("CLIENT_ID", "CLIENT_SECRET"),
+    ("AGENT_OAUTH_CLIENT_ID", "AGENT_OAUTH_CLIENT_SECRET"),
+)
+
+
 def client_credentials_from_env() -> tuple[str | None, str | None]:
-    """Resolve server-side OAuth client credentials.
-
-    Prefer explicit admin vars (GENESYS_CLIENT_*). On Render the ops demo often
-    only configures GENESYS_AGENT_* for site-picker sign-in; those work for
-    client-credentials API calls too when the admin pair is absent.
-    """
-    client_id = env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID")
-    client_secret = env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET")
-    if client_id and client_secret:
-        return client_id, client_secret
-
-    agent_id = env_first("GENESYS_AGENT_CLIENT_ID", "AGENT_OAUTH_CLIENT_ID")
-    agent_secret = env_first("GENESYS_AGENT_CLIENT_SECRET", "AGENT_OAUTH_CLIENT_SECRET")
-    return agent_id, agent_secret
+    """Resolve server-side OAuth client credentials from any supported env name."""
+    for id_key, secret_key in _CREDENTIAL_PAIRS:
+        client_id = env_first(id_key)
+        client_secret = env_first(secret_key)
+        if client_id and client_secret:
+            return client_id, client_secret
+    return None, None
 
 
 def credential_source() -> str:
-    if env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID") and env_first(
-        "GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET"
-    ):
-        return "admin"
-    if env_first("GENESYS_AGENT_CLIENT_ID", "AGENT_OAUTH_CLIENT_ID") and env_first(
-        "GENESYS_AGENT_CLIENT_SECRET", "AGENT_OAUTH_CLIENT_SECRET"
-    ):
-        return "agent_fallback"
+    for id_key, secret_key in _CREDENTIAL_PAIRS:
+        if env_first(id_key) and env_first(secret_key):
+            return id_key
     return "none"
 
 
