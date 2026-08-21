@@ -1,5 +1,5 @@
 METRIC_THRESHOLDS = {
-    "asa": {"label": "ASA", "baseline": 40, "good_max": 25, "warn_max": 40, "unit": "sec", "description": "Average Speed to Answer"},
+    "asa": {"label": "ASA", "baseline": 40, "good_max": 25, "warn_max": 60, "unit": "sec", "description": "Average Speed to Answer"},
     "aht": {"label": "AHT", "baseline": 360, "good_max": 360, "warn_max": 480, "unit": "sec", "description": "Average Handle / Talk Time"},
     "acw": {"label": "ACW", "baseline": 45, "good_max": 45, "warn_max": 90, "unit": "sec", "description": "After Call Work"},
     "abandon_pct": {"label": "Abandon %", "baseline": 5, "good_max": 5, "warn_max": 10, "unit": "%", "description": "Percent of offered calls not answered"},
