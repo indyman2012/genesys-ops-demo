@@ -9,7 +9,7 @@ from app.queue_performance import fetch_queue_performance, parse_filters
 from app.tool_catalog import get_tool, tools_by_category
 from app.tool_runner import stream_tool_run
 from core.cli import create_client, tool_log
-from core.config import credentials_env_probe, missing_admin_credentials_message
+from core.config import credentials_env_probe, credential_source, missing_admin_credentials_message, client_credentials_present
 from core.demo_mode import is_demo_mode
 from core.genesys_client import safe_str
 from core.paths import OUTPUTS_DIR, PROJECT_ROOT, ensure_runtime_dirs
@@ -78,14 +78,17 @@ def health():
             "region": client.region,
             "api_host": client.api_host,
             "env_probe": probe,
-            "admin_credentials_set": True,
+            "credential_source": credential_source(),
+            "admin_credentials_set": probe.get("GENESYS_CLIENT_ID") and probe.get("GENESYS_CLIENT_SECRET"),
         })
     except Exception as exc:
         return jsonify({
             "ok": False,
             "error": str(exc),
             "env_probe": probe,
+            "credential_source": credential_source(),
             "admin_credentials_set": bool(probe.get("GENESYS_CLIENT_ID") and probe.get("GENESYS_CLIENT_SECRET")),
+            "credentials_ready": client_credentials_present(),
             "missing_env": missing_admin_credentials_message(),
         }), 500
 

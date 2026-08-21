@@ -33,9 +33,32 @@ def env_first(*names: str, default: str | None = None) -> str | None:
 
 
 def client_credentials_from_env() -> tuple[str | None, str | None]:
+    """Resolve server-side OAuth client credentials.
+
+    Prefer explicit admin vars (GENESYS_CLIENT_*). On Render the ops demo often
+    only configures GENESYS_AGENT_* for site-picker sign-in; those work for
+    client-credentials API calls too when the admin pair is absent.
+    """
     client_id = env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID")
     client_secret = env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET")
-    return client_id, client_secret
+    if client_id and client_secret:
+        return client_id, client_secret
+
+    agent_id = env_first("GENESYS_AGENT_CLIENT_ID", "AGENT_OAUTH_CLIENT_ID")
+    agent_secret = env_first("GENESYS_AGENT_CLIENT_SECRET", "AGENT_OAUTH_CLIENT_SECRET")
+    return agent_id, agent_secret
+
+
+def credential_source() -> str:
+    if env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID") and env_first(
+        "GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET"
+    ):
+        return "admin"
+    if env_first("GENESYS_AGENT_CLIENT_ID", "AGENT_OAUTH_CLIENT_ID") and env_first(
+        "GENESYS_AGENT_CLIENT_SECRET", "AGENT_OAUTH_CLIENT_SECRET"
+    ):
+        return "agent_fallback"
+    return "none"
 
 
 def client_credentials_present() -> bool:
@@ -57,19 +80,18 @@ def credentials_env_probe() -> dict[str, bool]:
 
 
 def missing_admin_credentials_message() -> str:
-    probe = credentials_env_probe()
-    missing = [key for key in ("GENESYS_CLIENT_ID", "GENESYS_CLIENT_SECRET") if not probe.get(key)]
-    if not missing:
+    if client_credentials_present():
         return ""
-    agent_ok = probe.get("GENESYS_AGENT_CLIENT_ID") and probe.get("GENESYS_AGENT_CLIENT_SECRET")
-    hint = (
-        "Add the admin OAuth client as GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET in Render "
-        "(Dashboard → Environment). These are separate from GENESYS_AGENT_CLIENT_ID / "
-        "GENESYS_AGENT_CLIENT_SECRET used for site-picker sign-in."
+    probe = credentials_env_probe()
+    missing_admin = [key for key in ("GENESYS_CLIENT_ID", "GENESYS_CLIENT_SECRET") if not probe.get(key)]
+    missing_agent = [key for key in ("GENESYS_AGENT_CLIENT_ID", "GENESYS_AGENT_CLIENT_SECRET") if not probe.get(key)]
+    if missing_admin and not missing_agent:
+        return ""
+    missing = missing_admin + missing_agent
+    return (
+        f"Missing OAuth credentials: {', '.join(missing)}. "
+        + CREDENTIAL_ENV_HINT
     )
-    if agent_ok:
-        hint += " Agent OAuth is configured; admin client credentials are still missing."
-    return f"Missing: {', '.join(missing)}. {hint}"
 
 
 def load_client_env(env_path: Path | None = None) -> Path | None:
