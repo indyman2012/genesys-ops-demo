@@ -189,7 +189,7 @@ def oauth_login():
     oauth_for = (request.args.get("for") or "").strip().lower()
     popup = bool(request.args.get("popup"))
 
-    if current_app.config.get("DEMO_MODE") and oauth_for != "site-picker":
+    if current_app.config.get("DEMO_MODE") and oauth_for not in ("site-picker", "queue-performance"):
         return render_template(
             "agent_workspace/oauth_error.html",
             demo_mode=True,
@@ -199,6 +199,10 @@ def oauth_login():
 
     if oauth_for == "site-picker":
         session["oauth_for"] = "site-picker"
+    elif oauth_for == "queue-performance":
+        session["oauth_for"] = "queue-performance"
+        next_url = (request.args.get("next") or "/queue-performance").strip()
+        session["oauth_next"] = next_url or "/queue-performance"
 
     try:
         verifier: str | None = None
@@ -226,9 +230,14 @@ def oauth_login():
 def oauth_callback():
     from flask import current_app
 
+    from app.ops_auth import allowed_role_names, sync_queue_performance_access
+    from core.cli import create_client, tool_log
+
     oauth_for = session.get("oauth_for")
-    if current_app.config.get("DEMO_MODE") and oauth_for != "site-picker":
+    if current_app.config.get("DEMO_MODE") and oauth_for not in ("site-picker", "queue-performance"):
         return redirect(url_for("agent.index"))
+
+    popup = oauth_for == "site-picker"
 
     oauth_error = request.args.get("error")
     if oauth_error:
@@ -237,7 +246,7 @@ def oauth_callback():
             render_template(
                 "agent_workspace/oauth_error.html",
                 message=description,
-                popup=True,
+                popup=popup,
             ),
             400,
         )
@@ -250,7 +259,7 @@ def oauth_callback():
             render_template(
                 "agent_workspace/oauth_error.html",
                 message="Missing authorization code from Genesys.",
-                popup=True,
+                popup=popup,
             ),
             400,
         )
@@ -259,7 +268,7 @@ def oauth_callback():
             render_template(
                 "agent_workspace/oauth_error.html",
                 message="OAuth state mismatch. Please try signing in again.",
-                popup=True,
+                popup=popup,
             ),
             400,
         )
@@ -270,7 +279,7 @@ def oauth_callback():
             render_template(
                 "agent_workspace/oauth_error.html",
                 message="OAuth session expired. Please try signing in again.",
-                popup=True,
+                popup=popup,
             ),
             400,
         )
@@ -282,6 +291,41 @@ def oauth_callback():
         )
         user = fetch_current_user(tokens.access_token)
         persist_session(session, tokens=tokens, user=user)
+
+        if oauth_for == "queue-performance":
+            next_url = session.pop("oauth_next", "/queue-performance") or "/queue-performance"
+            session.pop("oauth_for", None)
+            try:
+                client = create_client(log=tool_log)
+                allowed, role_names, matched = sync_queue_performance_access(session, client)
+            except Exception as exc:
+                return (
+                    render_template(
+                        "ops/queue_performance_denied.html",
+                        demo_mode=bool(current_app.config.get("DEMO_MODE")),
+                        user_name=user.display_name,
+                        user_roles=[],
+                        required_roles=sorted(allowed_role_names()),
+                        matched_roles=[],
+                        error_message=f"Could not verify Genesys roles: {exc}",
+                    ),
+                    502,
+                )
+            if not allowed:
+                return (
+                    render_template(
+                        "ops/queue_performance_denied.html",
+                        demo_mode=bool(current_app.config.get("DEMO_MODE")),
+                        user_name=user.display_name,
+                        user_roles=role_names,
+                        required_roles=sorted(allowed_role_names()),
+                        matched_roles=matched,
+                        error_message="",
+                    ),
+                    403,
+                )
+            return redirect(next_url)
+
         session.pop("oauth_for", None)
         return render_template(
             "agent_workspace/oauth_callback.html",
@@ -292,7 +336,7 @@ def oauth_callback():
             render_template(
                 "agent_workspace/oauth_error.html",
                 message=str(exc),
-                popup=True,
+                popup=popup,
             ),
             500,
         )

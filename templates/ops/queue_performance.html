@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=3">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
@@ -41,6 +41,10 @@
     </div>
     <div class="topbar-right">
       <div class="topbar-actions">
+        {% if auth_enabled and auth_user_name %}
+        <span class="auth-user">Signed in as {{ auth_user_name }}</span>
+        <a href="{{ url_for('ops.queue_performance_logout') }}" class="btn btn-secondary">Sign out</a>
+        {% endif %}
         <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Ops Console</a>
         <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>
         <button type="button" id="btn-refresh" class="btn btn-primary">Refresh</button>
@@ -264,6 +268,6 @@
   </main>
   </div>
 
-  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=3"></script>
 </body>
 </html>

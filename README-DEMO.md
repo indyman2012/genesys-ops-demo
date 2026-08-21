@@ -84,6 +84,23 @@ More control, small free allowance, good if you already use containers.
 3. Deploy **`ops_app_demo.py`** only, not `ops_app.py`.
 4. Set `OPS_DEMO_MODE=1` on the host (demo entry point sets this automatically).
 
+### Queue Performance sign-in
+
+By default, `/queue-performance` requires **Genesys OAuth sign-in** and one of these roles:
+
+- Supervisor
+- Admin (`admin` in Genesys)
+- Super Admin
+
+Uses the same `GENESYS_AGENT_*` OAuth client as site picker (`/agent/oauth/callback` redirect).
+
+Optional env vars:
+
+- `OPS_QUEUE_PERFORMANCE_PUBLIC=1` — disable sign-in (public demo mode)
+- `OPS_QUEUE_PERFORMANCE_ROLES=Supervisor,Admin,Super Admin` — override allowed role names (case-insensitive)
+
+The server still uses `GENESYS_CLIENT_*` (client credentials) to fetch org-wide analytics after you sign in.
+
 ---
 
 ## One-time install (host or local)

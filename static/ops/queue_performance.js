@@ -258,6 +258,20 @@
       (queue.offered != null ? formatNumber(queue.offered) + " offered" : "") + division;
   }
 
+  async function handleAuthFailure(response, payload) {
+    if (response.status === 401 && payload && payload.login_url) {
+      window.location.href = payload.login_url;
+      return true;
+    }
+    if (response.status === 403) {
+      throw new Error(
+        (payload && payload.error) ||
+          "Access denied. Queue Performance requires Supervisor, Admin, or Super Admin."
+      );
+    }
+    return false;
+  }
+
   async function loadQueueDetail(queueId, queueName) {
     if (loading) return;
     loading = true;
@@ -271,6 +285,7 @@
         { headers: { Accept: "application/json" } }
       );
       const payload = await response.json();
+      if (await handleAuthFailure(response, payload)) return;
       if (!response.ok) {
         throw new Error(payload.error || "Failed to load queue detail.");
       }
@@ -305,6 +320,7 @@
         headers: { Accept: "application/json" },
       });
       const payload = await response.json();
+      if (await handleAuthFailure(response, payload)) return;
       if (!response.ok) {
         throw new Error(payload.error || "Failed to load queue performance data.");
       }

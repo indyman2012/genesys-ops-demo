@@ -4,6 +4,10 @@ import os
 
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
+from app.ops_auth import (
+    queue_performance_auth_enabled,
+    require_queue_performance_access,
+)
 from app.not_responding import fetch_not_responding_agents
 from app.queue_performance import fetch_queue_detail, fetch_queue_performance, parse_filters
 from app.tool_catalog import get_tool, tools_by_category
@@ -39,11 +43,35 @@ def not_responding_page():
 
 @ops_bp.route("/queue-performance")
 def queue_performance_page():
-    return render_template("ops/queue_performance.html", demo_mode=_demo_mode())
+    blocked = require_queue_performance_access()
+    if blocked:
+        return blocked
+    from flask import session
+
+    return render_template(
+        "ops/queue_performance.html",
+        demo_mode=_demo_mode(),
+        auth_enabled=queue_performance_auth_enabled(),
+        auth_user_name=session.get("genesys_user_name") or "",
+    )
+
+
+@ops_bp.route("/queue-performance/logout")
+def queue_performance_logout():
+    from app.agent_workspace.oauth import clear_session
+    from flask import redirect, session, url_for
+
+    clear_session(session)
+    session.pop("queue_performance_allowed", None)
+    session.pop("genesys_role_names", None)
+    return redirect(url_for("ops.queue_performance_page"))
 
 
 @ops_bp.route("/api/queue-performance")
 def queue_performance_api():
+    blocked = require_queue_performance_access()
+    if blocked:
+        return blocked
     try:
         client = create_client(log=tool_log)
         filters = parse_filters(request.args)
@@ -58,6 +86,9 @@ def queue_performance_api():
 
 @ops_bp.route("/api/queue-performance/queues/<queue_id>")
 def queue_performance_detail_api(queue_id: str):
+    blocked = require_queue_performance_access()
+    if blocked:
+        return blocked
     try:
         client = create_client(log=tool_log)
         filters = parse_filters(request.args)
