@@ -9,6 +9,7 @@ from app.queue_performance import fetch_queue_performance, parse_filters
 from app.tool_catalog import get_tool, tools_by_category
 from app.tool_runner import stream_tool_run
 from core.cli import create_client, tool_log
+from core.config import credentials_env_probe, missing_admin_credentials_message
 from core.demo_mode import is_demo_mode
 from core.genesys_client import safe_str
 from core.paths import OUTPUTS_DIR, PROJECT_ROOT, ensure_runtime_dirs
@@ -48,7 +49,11 @@ def queue_performance_api():
         filters = parse_filters(request.args)
         return jsonify(fetch_queue_performance(client, filters))
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        probe = credentials_env_probe()
+        payload = {"error": str(exc), "env_probe": probe}
+        if not probe.get("GENESYS_CLIENT_ID") or not probe.get("GENESYS_CLIENT_SECRET"):
+            payload["missing_env"] = missing_admin_credentials_message()
+        return jsonify(payload), 500
 
 
 @ops_bp.route("/api/not-responding")
@@ -62,6 +67,7 @@ def not_responding_api():
 
 @ops_bp.route("/health")
 def health():
+    probe = credentials_env_probe()
     try:
         client = create_client(log=tool_log)
         org = client.request("GET", "/api/v2/organizations/me")
@@ -71,9 +77,17 @@ def health():
             "organization": org.get("name"),
             "region": client.region,
             "api_host": client.api_host,
+            "env_probe": probe,
+            "admin_credentials_set": True,
         })
     except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "env_probe": probe,
+            "admin_credentials_set": bool(probe.get("GENESYS_CLIENT_ID") and probe.get("GENESYS_CLIENT_SECRET")),
+            "missing_env": missing_admin_credentials_message(),
+        }), 500
 
 
 @ops_bp.route("/api/tool/<tool_id>")

@@ -43,6 +43,35 @@ def client_credentials_present() -> bool:
     return bool(client_id and client_secret)
 
 
+def credentials_env_probe() -> dict[str, bool]:
+    """Report which credential-related env vars are set (names only, no values)."""
+    keys = (
+        "GENESYS_CLIENT_ID",
+        "GENESYS_CLIENT_SECRET",
+        "GENESYS_AGENT_CLIENT_ID",
+        "GENESYS_AGENT_CLIENT_SECRET",
+        "GENESYS_REGION",
+        "FLASK_SECRET_KEY",
+    )
+    return {key: bool(env_first(key)) for key in keys}
+
+
+def missing_admin_credentials_message() -> str:
+    probe = credentials_env_probe()
+    missing = [key for key in ("GENESYS_CLIENT_ID", "GENESYS_CLIENT_SECRET") if not probe.get(key)]
+    if not missing:
+        return ""
+    agent_ok = probe.get("GENESYS_AGENT_CLIENT_ID") and probe.get("GENESYS_AGENT_CLIENT_SECRET")
+    hint = (
+        "Add the admin OAuth client as GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET in Render "
+        "(Dashboard → Environment). These are separate from GENESYS_AGENT_CLIENT_ID / "
+        "GENESYS_AGENT_CLIENT_SECRET used for site-picker sign-in."
+    )
+    if agent_ok:
+        hint += " Agent OAuth is configured; admin client credentials are still missing."
+    return f"Missing: {', '.join(missing)}. {hint}"
+
+
 def load_client_env(env_path: Path | None = None) -> Path | None:
     """Load Genesys credentials from process env or client.env (local dev).
 
@@ -73,7 +102,7 @@ def load_client_env(env_path: Path | None = None) -> Path | None:
 
     raise FileNotFoundError(
         "Genesys client credentials not found. "
-        f"{CREDENTIAL_ENV_HINT} Expected file path: {PROJECT_ROOT / 'client.env'}"
+        f"{missing_admin_credentials_message() or CREDENTIAL_ENV_HINT}"
     )
 
 
