@@ -295,7 +295,7 @@ def get_phone_detail(access_token: str, phone_id: str) -> dict[str, Any] | None:
     return _fetch_phone_by_id(access_token, phone_id)
 
 
-SITE_PICKER_BUILD = "2026-06-29-agent-phone-change-v2"
+SITE_PICKER_BUILD = "2026-06-29-agent-phone-change-v3"
 
 
 def _admin_credentials_available() -> bool:
@@ -325,6 +325,9 @@ def change_phone_site_admin(phone_id: str, target_site: dict[str, Any]) -> dict[
         f"/api/v2/telephony/providers/edges/phones/{phone_id}",
         json_body=payload,
     )
+
+
+def resolve_site(access_token: str, site_id: str) -> dict[str, Any]:
     return _user_request(
         access_token,
         "GET",
