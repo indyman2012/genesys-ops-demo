@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import base64
 import os
-from pathlib import Path
 from typing import Any
 
 import requests
 
+from core.config import CREDENTIAL_ENV_HINT, client_credentials_from_env, env_first, load_client_env
 
 REGION_HOSTS = {
     "usw2": "https://api.usw2.pure.cloud",
@@ -16,28 +16,6 @@ REGION_HOSTS = {
     "us": "https://api.mypurecloud.com",
     "mypurecloud.com": "https://api.mypurecloud.com",
 }
-
-
-def load_client_env() -> None:
-    for env_path in [Path.cwd() / "client.env", Path(__file__).resolve().parent.parent / "client.env"]:
-        if not env_path.exists():
-            continue
-
-        for raw in env_path.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-        return
-
-
-def env_first(*names: str, default: str | None = None) -> str | None:
-    for name in names:
-        value = os.environ.get(name)
-        if value not in (None, ""):
-            return value
-    return default
 
 
 def get_api_base() -> str:
@@ -52,12 +30,11 @@ def get_api_base() -> str:
 
 def get_access_token() -> str:
     load_client_env()
-
-    client_id = env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID")
-    client_secret = env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET")
-
+    client_id, client_secret = client_credentials_from_env()
     if not client_id or not client_secret:
-        raise RuntimeError("Missing GENESYS_CLIENT_ID / GENESYS_CLIENT_SECRET in client.env")
+        raise RuntimeError(
+            "Missing GENESYS_CLIENT_ID / GENESYS_CLIENT_SECRET. " + CREDENTIAL_ENV_HINT
+        )
 
     api_base = get_api_base()
     token_url = f"{api_base}/oauth/token"

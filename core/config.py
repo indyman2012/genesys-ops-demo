@@ -18,6 +18,11 @@ REGION_ALIASES: dict[str, str] = {
 
 DEFAULT_REGION = "usw2"
 
+CREDENTIAL_ENV_HINT = (
+    "Set GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET in the host environment "
+    "(Render dashboard → Environment), or create client.env for local development."
+)
+
 
 def env_first(*names: str, default: str | None = None) -> str | None:
     for name in names:
@@ -27,8 +32,26 @@ def env_first(*names: str, default: str | None = None) -> str | None:
     return default
 
 
-def load_client_env(env_path: Path | None = None) -> Path:
-    """Load client.env without overwriting existing environment variables."""
+def client_credentials_from_env() -> tuple[str | None, str | None]:
+    client_id = env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID")
+    client_secret = env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET")
+    return client_id, client_secret
+
+
+def client_credentials_present() -> bool:
+    client_id, client_secret = client_credentials_from_env()
+    return bool(client_id and client_secret)
+
+
+def load_client_env(env_path: Path | None = None) -> Path | None:
+    """Load Genesys credentials from process env or client.env (local dev).
+
+    Process environment variables always win. When GENESYS_CLIENT_ID and
+    GENESYS_CLIENT_SECRET are already set (e.g. on Render), no file is required.
+    """
+    if client_credentials_present():
+        return None
+
     candidates = [
         env_path,
         Path.cwd() / "client.env",
@@ -45,24 +68,21 @@ def load_client_env(env_path: Path | None = None) -> Path:
                 line = line[len("export ") :].strip()
             key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-        return candidate
-
-    client_id = env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID")
-    client_secret = env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET")
-    if client_id and client_secret:
-        return PROJECT_ROOT / "client.env"
+        if client_credentials_present():
+            return candidate
 
     raise FileNotFoundError(
-        f"client.env not found. Expected at {PROJECT_ROOT / 'client.env'}"
-        " or set GENESYS_CLIENT_ID / GENESYS_CLIENT_SECRET in the environment."
+        "Genesys client credentials not found. "
+        f"{CREDENTIAL_ENV_HINT} Expected file path: {PROJECT_ROOT / 'client.env'}"
     )
 
 
 def normalize_region(raw: str | None = None) -> str:
-    try:
-        load_client_env()
-    except FileNotFoundError:
-        pass
+    if not client_credentials_present():
+        try:
+            load_client_env()
+        except FileNotFoundError:
+            pass
     value = (raw or env_first(
         "GENESYS_REGION",
         "PURECLOUD_REGION",
@@ -118,8 +138,9 @@ def genesys_analytics_dashboards_url(region: str | None = None) -> str:
 
 def get_client_credentials() -> tuple[str, str]:
     load_client_env()
-    client_id = env_first("GENESYS_CLIENT_ID", "PURECLOUD_CLIENT_ID", "CLIENT_ID")
-    client_secret = env_first("GENESYS_CLIENT_SECRET", "PURECLOUD_CLIENT_SECRET", "CLIENT_SECRET")
+    client_id, client_secret = client_credentials_from_env()
     if not client_id or not client_secret:
-        raise RuntimeError("Missing GENESYS_CLIENT_ID / GENESYS_CLIENT_SECRET in client.env")
+        raise RuntimeError(
+            "Missing GENESYS_CLIENT_ID / GENESYS_CLIENT_SECRET. " + CREDENTIAL_ENV_HINT
+        )
     return client_id, client_secret

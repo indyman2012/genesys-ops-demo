@@ -41,11 +41,13 @@ Best balance for a Flask demo: free tier, easy env vars, custom subdomain.
 - Sign up: https://render.com
 - New **Web Service** → connect Git repo (or manual deploy)
 - **Start command:** `gunicorn ops_app_demo:app --bind 0.0.0.0:$PORT --timeout 600`
-- **Environment variables** (Dashboard → Environment):
+- **Environment variables** (Dashboard → Environment) — **no `client.env` file on Render**:
   - `OPS_DEMO_MODE=1`
-  - `GENESYS_CLIENT_ID=...`
+  - `GENESYS_CLIENT_ID=...` (admin OAuth client — required for Queue Performance, Not Responding, tool dry-runs)
   - `GENESYS_CLIENT_SECRET=...`
   - `GENESYS_REGION=usw2`
+  - `FLASK_SECRET_KEY=...` (random string — required for site picker sessions)
+  - `GENESYS_AGENT_CLIENT_ID=...` / `GENESYS_AGENT_CLIENT_SECRET=...` (site picker sign-in)
 - Free tier sleeps after ~15 min idle (cold start ~30s on first visit)
 
 A starter spec is in `render.demo.yaml`.

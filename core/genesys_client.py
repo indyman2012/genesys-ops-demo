@@ -73,7 +73,7 @@ class GenesysClient:
         self.login_host = ""
 
     def authenticate(self) -> None:
-        load_client_env(self.env_path or self.root / "client.env")
+        load_client_env(self.env_path)
         self.region = normalize_region()
         self.api_host = get_api_host(self.region)
         self.login_host = get_login_host(self.region)
