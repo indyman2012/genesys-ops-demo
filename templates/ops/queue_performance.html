@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en" data-demo-mode="{{ '1' if demo_mode else '0' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Queue Performance — ArchWell Health Ops</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='agent_workspace/archwell-favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=1">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
+  <div class="app-shell">
+  {% if demo_mode %}
+  <div class="demo-banner">
+    <strong>Demo mode</strong> — live read-only analytics. No changes can be applied from this instance.
+  </div>
+  {% endif %}
+
+  <div class="topbar-strip">
+    <span>Contact Center · Queue performance</span>
+  </div>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <p class="page-subtitle">Inbound voice queue metrics with health color coding — same data as Genesys Queue Performance, reorganized for faster scanning.</p>
+    </div>
+    <div class="brand">
+      <img
+        class="brand-logo"
+        src="{{ url_for('static', filename='agent_workspace/archwell-logo.svg') }}"
+        alt="ArchWell Health"
+        width="160"
+        height="47"
+      >
+      <div class="brand-sub">Queue Performance{% if demo_mode %} <span class="demo-tag">Demo</span>{% endif %}</div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-actions">
+        <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Ops Console</a>
+        <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>
+        <button type="button" id="btn-refresh" class="btn btn-primary">Refresh</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="qp-layout">
+    <aside class="qp-filters">
+      <h2>Filters</h2>
+      <p class="filter-help">Defaults to Patient Services inbound voice for the last 7 days.</p>
+      <form id="filter-form" class="filter-form">
+        <label>
+          Start date
+          <input type="date" name="start_date" id="start-date">
+        </label>
+        <label>
+          End date
+          <input type="date" name="end_date" id="end-date">
+        </label>
+        <label>
+          Quick range
+          <select name="days" id="days-select">
+            <option value="">Custom dates</option>
+            <option value="7" selected>Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </label>
+        <label>
+          Division
+          <select name="division" id="division-select">
+            <option value="">All divisions</option>
+          </select>
+        </label>
+        <label>
+          Queue prefix
+          <input type="text" name="queue_prefix" id="queue-prefix" value="Patient Services" placeholder="Patient Services">
+        </label>
+        <div class="target-block">
+          <div class="target-title">Targets (for color coding)</div>
+          <label>Service level % <input type="number" step="1" name="target_service_level_pct" id="target-sl" value="80"></label>
+          <label>ASA (sec) <input type="number" step="1" name="target_asa" id="target-asa" value="30"></label>
+          <label>AHT / talk (sec) <input type="number" step="1" name="target_aht" id="target-aht" value="360"></label>
+          <label>ACW (sec) <input type="number" step="1" name="target_acw" id="target-acw" value="45"></label>
+          <label>Abandon % <input type="number" step="0.1" name="target_abandon_pct" id="target-abandon" value="5"></label>
+        </div>
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </form>
+      <div class="legend">
+        <h3>Color key</h3>
+        <div><span class="pill green">Green</span> At or better than target</div>
+        <div><span class="pill yellow">Yellow</span> Moderately off target</div>
+        <div><span class="pill red">Red</span> Needs attention</div>
+      </div>
+    </aside>
+
+    <section class="qp-main">
+      <p id="error-banner" class="error-banner hidden"></p>
+
+      <section class="qp-status">
+        <div class="status-card">
+          <span class="status-label">Queues in view</span>
+          <span id="queue-count" class="status-value">—</span>
+        </div>
+        <div class="status-card">
+          <span class="status-label">Offered</span>
+          <span id="summary-offered" class="status-value">—</span>
+        </div>
+        <div class="status-card">
+          <span class="status-label">Service level</span>
+          <span id="summary-sl" class="status-value">—</span>
+        </div>
+        <div class="status-card">
+          <span class="status-label">Abandon %</span>
+          <span id="summary-abandon" class="status-value">—</span>
+        </div>
+        <div class="status-card">
+          <span class="status-label">ASA</span>
+          <span id="summary-asa" class="status-value">—</span>
+        </div>
+        <div class="status-card">
+          <span class="status-label">Last updated</span>
+          <span id="last-updated" class="status-value small">—</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Volume trend</h2>
+          <p>Daily offered vs answered vs abandoned</p>
+        </div>
+        <div class="chart-wrap"><canvas id="volume-chart"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Performance trend</h2>
+          <p>Service level, abandon rate, and ASA over time</p>
+        </div>
+        <div class="chart-wrap"><canvas id="perf-chart"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Queue scorecard</h2>
+          <p>Sorted by health (needs attention first), then volume. Cells are color-coded against your targets.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="qp-table">
+            <thead>
+              <tr>
+                <th>Health</th>
+                <th>Queue</th>
+                <th>Division</th>
+                <th class="num">Offered</th>
+                <th class="num">Answered</th>
+                <th class="num">Abandoned</th>
+                <th class="num">Abandon %</th>
+                <th class="num">Service level</th>
+                <th class="num">ASA</th>
+                <th class="num">Talk</th>
+                <th class="num">Hold</th>
+                <th class="num">ACW</th>
+                <th class="num">Handle</th>
+              </tr>
+            </thead>
+            <tbody id="queue-rows">
+              <tr class="empty-row"><td colspan="13">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=1"></script>
+</body>
+</html>

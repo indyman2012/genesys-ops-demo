@@ -5,6 +5,7 @@ import os
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
 from app.not_responding import fetch_not_responding_agents
+from app.queue_performance import fetch_queue_performance, parse_filters
 from app.tool_catalog import get_tool, tools_by_category
 from app.tool_runner import stream_tool_run
 from core.cli import create_client, tool_log
@@ -33,6 +34,21 @@ def index():
 @ops_bp.route("/not-responding")
 def not_responding_page():
     return render_template("ops/not_responding.html", demo_mode=_demo_mode())
+
+
+@ops_bp.route("/queue-performance")
+def queue_performance_page():
+    return render_template("ops/queue_performance.html", demo_mode=_demo_mode())
+
+
+@ops_bp.route("/api/queue-performance")
+def queue_performance_api():
+    try:
+        client = create_client(log=tool_log)
+        filters = parse_filters(request.args)
+        return jsonify(fetch_queue_performance(client, filters))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 @ops_bp.route("/api/not-responding")
