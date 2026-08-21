@@ -19,8 +19,8 @@ REGION_ALIASES: dict[str, str] = {
 DEFAULT_REGION = "usw2"
 
 CREDENTIAL_ENV_HINT = (
-    "Set GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET in the host environment "
-    "(Render dashboard → Environment), or create client.env for local development."
+    "Set GENESYS_AGENT_CLIENT_ID and GENESYS_AGENT_CLIENT_SECRET on Render, or "
+    "GENESYS_CLIENT_ID and GENESYS_CLIENT_SECRET in client.env for local dev."
 )
 
 
@@ -82,15 +82,10 @@ def credentials_env_probe() -> dict[str, bool]:
 def missing_admin_credentials_message() -> str:
     if client_credentials_present():
         return ""
-    probe = credentials_env_probe()
-    missing_admin = [key for key in ("GENESYS_CLIENT_ID", "GENESYS_CLIENT_SECRET") if not probe.get(key)]
-    missing_agent = [key for key in ("GENESYS_AGENT_CLIENT_ID", "GENESYS_AGENT_CLIENT_SECRET") if not probe.get(key)]
-    if missing_admin and not missing_agent:
-        return ""
-    missing = missing_admin + missing_agent
     return (
-        f"Missing OAuth credentials: {', '.join(missing)}. "
-        + CREDENTIAL_ENV_HINT
+        "Missing OAuth client credentials. Set GENESYS_AGENT_CLIENT_ID and "
+        "GENESYS_AGENT_CLIENT_SECRET on Render (or GENESYS_CLIENT_ID / "
+        "GENESYS_CLIENT_SECRET in client.env for local dev)."
     )
 
 

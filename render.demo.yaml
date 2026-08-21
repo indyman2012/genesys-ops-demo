@@ -12,17 +12,17 @@ services:
         value: "3.13.0"
       - key: GENESYS_REGION
         value: usw2
-      # Admin OAuth client — set values in Render dashboard (never commit client.env)
-      - key: GENESYS_CLIENT_ID
-        sync: false
-      - key: GENESYS_CLIENT_SECRET
-        sync: false
-      # Site picker + agent OAuth session
       - key: FLASK_SECRET_KEY
         sync: false
+      # OAuth client — Render demo uses GENESYS_AGENT_* (same client for sign-in + API)
       - key: GENESYS_AGENT_CLIENT_ID
         sync: false
       - key: GENESYS_AGENT_CLIENT_SECRET
+        sync: false
+      # Optional local-style names (client.env); not required if AGENT_* are set
+      - key: GENESYS_CLIENT_ID
+        sync: false
+      - key: GENESYS_CLIENT_SECRET
         sync: false
       # Optional: GENESYS_AGENT_USE_PKCE=0 if agent OAuth client has no secret
       # Register redirect: https://YOUR-SERVICE.onrender.com/site-picker/oauth/callback
