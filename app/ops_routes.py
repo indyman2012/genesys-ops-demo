@@ -136,6 +136,36 @@ def queue_performance_export_pdf():
         return jsonify({"error": str(exc)}), 500
 
 
+@ops_bp.route("/api/queue-performance/export.xlsx")
+def queue_performance_export_excel():
+    blocked = require_queue_performance_access()
+    if blocked:
+        return blocked
+    try:
+        from app.queue_performance_export import build_workbook_bytes, excel_filename
+
+        client = create_client(log=tool_log)
+        filters = parse_filters(request.args)
+        queue_id = safe_str(request.args.get("queue_id"))
+        if queue_id:
+            payload = fetch_queue_detail(client, queue_id, filters)
+            xlsx_bytes = build_workbook_bytes(payload, detail=True)
+            filename = excel_filename(filters, queue_name=(payload.get("queue") or {}).get("queue_name"))
+        else:
+            payload = fetch_queue_performance(client, filters)
+            xlsx_bytes = build_workbook_bytes(payload, detail=False)
+            filename = excel_filename(filters)
+        return Response(
+            xlsx_bytes,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 @ops_bp.route("/api/not-responding")
 def not_responding_api():
     try:

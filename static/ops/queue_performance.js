@@ -5,6 +5,7 @@
   const errorBanner = document.getElementById("error-banner");
   const refreshBtn = document.getElementById("btn-refresh");
   const exportPdfBtn = document.getElementById("btn-export-pdf");
+  const exportExcelBtn = document.getElementById("btn-export-excel");
   const reportPeriodEl = document.getElementById("report-period");
   const backBtn = document.getElementById("btn-back");
   const divisionSelect = document.getElementById("division-select");
@@ -51,8 +52,7 @@
   }
 
   function formatSec(value) {
-    if (value == null || value === "") return "—";
-    return Number(value).toFixed(1) + "s";
+    return formatMmSs(value);
   }
 
   function metricCell(value, status, formatter) {
@@ -103,22 +103,58 @@
     reportPeriodEl.classList.remove("hidden");
   }
 
-  function exportPdfUrl() {
+  function formatMmSs(value) {
+    if (value == null || value === "") return "—";
+    const total = Math.max(0, Math.round(Number(value)));
+    if (!Number.isFinite(total)) return "—";
+    const minutes = Math.floor(total / 60);
+    const seconds = total % 60;
+    return minutes + ":" + String(seconds).padStart(2, "0");
+  }
+
+  function chartTrendData(payload) {
+    return payload.trend_90d || payload.trend || [];
+  }
+
+  function chartDateLabels(trend) {
+    return (trend || []).map(function (row) {
+      const date = row.date || "";
+      return date.length >= 10 ? date.slice(5) : date;
+    });
+  }
+
+  function exportUrl(path) {
     const params = new URLSearchParams(buildQuery());
     if (selectedQueueId) params.set("queue_id", selectedQueueId);
-    return "/api/queue-performance/export.pdf?" + params.toString();
+    return path + "?" + params.toString();
+  }
+
+  function exportPdfUrl() {
+    return exportUrl("/api/queue-performance/export.pdf");
+  }
+
+  function exportExcelUrl() {
+    return exportUrl("/api/queue-performance/export.xlsx");
+  }
+
+  function triggerDownload(button, idleLabel, url) {
+    if (loading) return;
+    setError("");
+    button.disabled = true;
+    button.textContent = "Exporting…";
+    window.location.href = url;
+    window.setTimeout(function () {
+      button.disabled = false;
+      button.textContent = idleLabel;
+    }, 2500);
   }
 
   function exportPdf() {
-    if (loading) return;
-    setError("");
-    exportPdfBtn.disabled = true;
-    exportPdfBtn.textContent = "Exporting…";
-    window.location.href = exportPdfUrl();
-    window.setTimeout(function () {
-      exportPdfBtn.disabled = false;
-      exportPdfBtn.textContent = "Export PDF";
-    }, 2500);
+    triggerDownload(exportPdfBtn, "Export PDF", exportPdfUrl());
+  }
+
+  function exportExcel() {
+    triggerDownload(exportExcelBtn, "Export Excel", exportExcelUrl());
   }
 
   function renderSummary(summary, queueCount) {
@@ -196,7 +232,7 @@
   function renderCharts(trend, volumeCanvasId, perfCanvasId) {
     const volumeCanvas = document.getElementById(volumeCanvasId);
     const perfCanvas = document.getElementById(perfCanvasId);
-    const labels = (trend || []).map(function (row) { return row.date; });
+    const labels = chartDateLabels(trend);
     const offered = (trend || []).map(function (row) { return row.offered || 0; });
     const answered = (trend || []).map(function (row) { return row.answered || 0; });
     const abandoned = (trend || []).map(function (row) { return row.abandoned || 0; });
@@ -229,16 +265,43 @@
         datasets: [
           { label: "Service level %", data: serviceLevel, borderColor: "#1f6b3a", yAxisID: "y", tension: 0.25 },
           { label: "Abandon %", data: abandonPct, borderColor: "#9b1c1c", yAxisID: "y", tension: 0.25 },
-          { label: "ASA (sec)", data: asa, borderColor: "#1f4b99", yAxisID: "y1", tension: 0.25 },
+          { label: "ASA", data: asa, borderColor: "#1f4b99", yAxisID: "y1", tension: 0.25 },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                let label = context.dataset.label || "";
+                if (label) label += ": ";
+                if (context.dataset.yAxisID === "y1") {
+                  label += formatMmSs(context.parsed.y);
+                } else if (context.parsed.y != null) {
+                  label += Number(context.parsed.y).toFixed(1) + "%";
+                }
+                return label;
+              },
+            },
+          },
+        },
         scales: {
           y: { type: "linear", position: "left", beginAtZero: true, title: { display: true, text: "%" } },
-          y1: { type: "linear", position: "right", beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: "Seconds" } },
+          y1: {
+            type: "linear",
+            position: "right",
+            beginAtZero: true,
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: "MM:SS" },
+            ticks: {
+              callback: function (value) {
+                return formatMmSs(value);
+              },
+            },
+          },
         },
       },
     });
@@ -335,7 +398,7 @@
       renderAgents(payload.agents || []);
       detailVolumeChart = destroyChart(detailVolumeChart);
       detailPerfChart = destroyChart(detailPerfChart);
-      const detailCharts = renderCharts(payload.trend || [], "detail-volume-chart", "detail-perf-chart");
+      const detailCharts = renderCharts(chartTrendData(payload), "detail-volume-chart", "detail-perf-chart");
       detailVolumeChart = detailCharts.volume;
       detailPerfChart = detailCharts.perf;
       document.getElementById("last-updated").textContent = new Date().toLocaleString();
@@ -371,7 +434,7 @@
       renderQueues(payload.queues || []);
       volumeChart = destroyChart(volumeChart);
       perfChart = destroyChart(perfChart);
-      const charts = renderCharts(payload.trend || [], "volume-chart", "perf-chart");
+      const charts = renderCharts(chartTrendData(payload), "volume-chart", "perf-chart");
       volumeChart = charts.volume;
       perfChart = charts.perf;
       document.getElementById("last-updated").textContent = new Date().toLocaleString();
@@ -437,6 +500,7 @@
   });
 
   exportPdfBtn.addEventListener("click", exportPdf);
+  exportExcelBtn.addEventListener("click", exportExcel);
 
   backBtn.addEventListener("click", showOverview);
 

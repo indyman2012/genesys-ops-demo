@@ -73,9 +73,11 @@ def _fmt_sec(value: Any) -> str:
     if value is None or value == "":
         return "—"
     try:
-        return f"{float(value):.1f}s"
+        total = max(0, int(round(float(value))))
     except (TypeError, ValueError):
         return "—"
+    minutes, seconds = divmod(total, 60)
+    return f"{minutes}:{seconds:02d}"
 
 
 def _status_fill(status: str | None) -> colors.Color:

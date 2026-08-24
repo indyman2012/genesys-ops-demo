@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=5">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
@@ -48,6 +48,7 @@
         <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Ops Console</a>
         <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>
         <button type="button" id="btn-refresh" class="btn btn-primary">Refresh</button>
+        <button type="button" id="btn-export-excel" class="btn btn-secondary">Export Excel</button>
         <button type="button" id="btn-export-pdf" class="btn btn-secondary">Export PDF</button>
       </div>
     </div>
@@ -73,6 +74,7 @@
             <option value="7" selected>Last 7 days</option>
             <option value="14">Last 14 days</option>
             <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
           </select>
         </label>
         <label>
@@ -138,16 +140,16 @@
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Volume trend</h2>
-            <p>Daily offered vs answered vs abandoned (all filtered queues)</p>
+            <h2>Volume trend (90 days)</h2>
+            <p>Daily offered vs answered vs abandoned — ending on your scorecard end date</p>
           </div>
           <div class="chart-wrap"><canvas id="volume-chart"></canvas></div>
         </section>
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Performance trend</h2>
-            <p>Service level, abandon rate, and ASA over time</p>
+            <h2>Performance trend (90 days)</h2>
+            <p>Service level, abandon rate, and ASA (MM:SS) over time</p>
           </div>
           <div class="chart-wrap"><canvas id="perf-chart"></canvas></div>
         </section>
@@ -155,7 +157,7 @@
         <section class="panel">
           <div class="panel-head">
             <h2>Queue scorecard</h2>
-            <p>Sorted by health (needs attention first), then volume. Click a row to drill down.</p>
+            <p>Sorted by health (needs attention first), then volume. Metrics use the selected date range. Click a row to drill down.</p>
           </div>
           <div class="table-wrap">
             <table class="qp-table">
@@ -222,7 +224,7 @@
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Queue volume trend</h2>
+            <h2>Queue volume trend (90 days)</h2>
             <p>Daily offered vs answered vs abandoned for this queue</p>
           </div>
           <div class="chart-wrap"><canvas id="detail-volume-chart"></canvas></div>
@@ -230,8 +232,8 @@
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Queue performance trend</h2>
-            <p>Service level, abandon rate, and ASA for this queue</p>
+            <h2>Queue performance trend (90 days)</h2>
+            <p>Service level, abandon rate, and ASA (MM:SS) for this queue</p>
           </div>
           <div class="chart-wrap"><canvas id="detail-perf-chart"></canvas></div>
         </section>
@@ -270,6 +272,6 @@
   </main>
   </div>
 
-  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=4"></script>
+  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=5"></script>
 </body>
 </html>

@@ -12,7 +12,8 @@ from core.genesys_client import safe_str
 TZ_OFFSET_HOURS = 4
 DEFAULT_QUEUE_PREFIX = "Patient Services"
 DEFAULT_DAYS = 7
-MAX_DAYS = 60
+MAX_DAYS = 90
+TREND_CHART_DAYS = 90
 TIME_METRICS = ("tTalk", "tHeld", "tAcw", "tHandle", "tAnswered", "tWait")
 AGGREGATE_METRICS = (
     "nOffered",
@@ -380,6 +381,40 @@ def build_daily_trend(
     return trend
 
 
+def chart_trend_window(end_date: date) -> tuple[date, date]:
+    start_date = end_date - timedelta(days=TREND_CHART_DAYS - 1)
+    return start_date, end_date
+
+
+def fetch_daily_trend(
+    client,
+    *,
+    start_date: date,
+    end_date: date,
+    scoped_ids: set[str] | None = None,
+    queue_id: str | None = None,
+) -> list[dict[str, Any]]:
+    interval = api_interval(start_date, end_date)
+    resp = query_conversation_aggregates(
+        client,
+        interval=interval,
+        group_by=["queueId"],
+        queue_id=queue_id,
+    )
+    allowed = {queue_id} if queue_id else scoped_ids
+    per_day: dict[str, MetricAccumulator] = defaultdict(MetricAccumulator)
+    for result in resp.get("results") or []:
+        group = result.get("group") if isinstance(result.get("group"), dict) else {}
+        entity_id = safe_str(group.get("queueId"))
+        if allowed is not None and entity_id not in allowed:
+            continue
+        for data_bucket in result.get("data") or []:
+            parsed = bucket_metrics(data_bucket)
+            if parsed:
+                per_day[day_key(data_bucket.get("interval") or "")].absorb(parsed)
+    return build_daily_trend(start_date, end_date, per_day)
+
+
 def absorb_aggregate_results(
     resp: dict[str, Any],
     *,
@@ -453,6 +488,13 @@ def fetch_queue_detail(
     queue_acc = per_queue.get(queue_id) or MetricAccumulator()
     summary = enrich_queue_row(queue_meta, queue_acc.to_metrics(), filters)
     trend = build_daily_trend(start_date, end_date, per_day)
+    chart_start, chart_end = chart_trend_window(end_date)
+    trend_90d = fetch_daily_trend(
+        client,
+        start_date=chart_start,
+        end_date=chart_end,
+        queue_id=queue_id,
+    )
 
     agent_rows: list[dict[str, Any]] = []
     user_ids = {uid for uid, acc in per_agent.items() if acc.offered > 0 or acc.answered > 0}
@@ -477,6 +519,8 @@ def fetch_queue_detail(
         "interval": interval,
         "queue": summary,
         "trend": trend,
+        "trend_90d": trend_90d,
+        "trend_chart_days": TREND_CHART_DAYS,
         "agents": agent_rows,
         "agent_count": len(agent_rows),
         "metric_thresholds": METRIC_THRESHOLDS,
@@ -564,14 +608,14 @@ def fetch_queue_performance(client, filters: dict[str, Any]) -> dict[str, Any]:
         filters,
     )
 
-    trend: list[dict[str, Any]] = []
-    cursor = start_date
-    while cursor <= end_date:
-        key = cursor.isoformat()
-        acc = per_day.get(key, MetricAccumulator())
-        day_metrics = acc.to_metrics()
-        trend.append({"date": key, **day_metrics})
-        cursor += timedelta(days=1)
+    trend = build_daily_trend(start_date, end_date, per_day)
+    chart_start, chart_end = chart_trend_window(end_date)
+    trend_90d = fetch_daily_trend(
+        client,
+        start_date=chart_start,
+        end_date=chart_end,
+        scoped_ids=scoped_ids,
+    )
 
     return {
         "filters": filters,
@@ -580,6 +624,8 @@ def fetch_queue_performance(client, filters: dict[str, Any]) -> dict[str, Any]:
         "summary": summary_row,
         "queues": queue_rows,
         "trend": trend,
+        "trend_90d": trend_90d,
+        "trend_chart_days": TREND_CHART_DAYS,
         "metric_thresholds": METRIC_THRESHOLDS,
         "queue_count": len(queue_rows),
         "generated_at": date.today().isoformat(),
