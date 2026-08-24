@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=4">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
@@ -48,6 +48,7 @@
         <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Ops Console</a>
         <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>
         <button type="button" id="btn-refresh" class="btn btn-primary">Refresh</button>
+        <button type="button" id="btn-export-pdf" class="btn btn-secondary">Export PDF</button>
       </div>
     </div>
   </header>
@@ -103,8 +104,9 @@
       </div>
     </aside>
 
-    <section class="qp-main">
+    <section class="qp-main" id="qp-export-root">
       <p id="error-banner" class="error-banner hidden"></p>
+      <p id="report-period" class="report-period hidden"></p>
 
       <div id="qp-overview">
         <section class="qp-status">
@@ -268,6 +270,6 @@
   </main>
   </div>
 
-  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=3"></script>
+  <script src="{{ url_for('static', filename='ops/queue_performance.js') }}?v=4"></script>
 </body>
 </html>

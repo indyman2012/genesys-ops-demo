@@ -95,6 +95,21 @@
   min-width: 0;
 }
 
+.report-period {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  background: #f4f8fb;
+  border: 1px solid var(--aw-border);
+  border-radius: 10px;
+  color: var(--aw-navy);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.report-period.hidden {
+  display: none;
+}
+
 .qp-status {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -185,6 +200,9 @@
   color: var(--aw-muted);
   background: #f8fafb;
   font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .qp-table td.num,
@@ -345,6 +363,37 @@
   font-size: 0.88rem;
   color: var(--aw-muted);
   margin-right: 0.25rem;
+}
+
+@media print {
+  .qp-filters,
+  .topbar-actions,
+  .demo-banner,
+  .detail-toolbar button,
+  .error-banner,
+  .filter-help,
+  .legend {
+    display: none !important;
+  }
+
+  .qp-layout {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+
+  .panel,
+  .status-card {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+
+  .chart-wrap {
+    height: 220px;
+  }
+
+  .qp-table th {
+    position: static;
+  }
 }
 
 @media (max-width: 960px) {

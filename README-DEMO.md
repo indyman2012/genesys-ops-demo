@@ -101,6 +101,15 @@ Optional env vars:
 
 The server still uses `GENESYS_CLIENT_*` (client credentials) to fetch org-wide analytics after you sign in.
 
+### PDF export
+
+- **On-page:** Queue Performance → **Export PDF** (overview or current queue drill-down).
+- **CLI:** `python tools/reporting/queue_performance_pdf_report.py --days 7`
+- **Scheduled weekly job:** prior Mon–Sun PDF to a shared folder:
+  - `python jobs/weekly_queue_performance_pdf.py --dry-run`
+  - Register: `powershell -File scripts/register_weekly_queue_performance_pdf_task.ps1`
+- **Shared folder env:** `QUEUE_PERFORMANCE_EXPORT_DIR=\\fileserver\share\QueuePerformance`
+
 ---
 
 ## One-time install (host or local)

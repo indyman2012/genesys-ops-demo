@@ -103,6 +103,39 @@ def queue_performance_detail_api(queue_id: str):
         return jsonify(payload), 500
 
 
+@ops_bp.route("/api/queue-performance/export.pdf")
+def queue_performance_export_pdf():
+    blocked = require_queue_performance_access()
+    if blocked:
+        return blocked
+    try:
+        from tools.reporting.queue_performance_pdf_report import (
+            generate_detail_pdf,
+            generate_overview_pdf,
+            pdf_filename,
+        )
+
+        client = create_client(log=tool_log)
+        filters = parse_filters(request.args)
+        queue_id = safe_str(request.args.get("queue_id"))
+        if queue_id:
+            pdf_bytes, payload = generate_detail_pdf(client, queue_id, filters)
+            queue_name = (payload.get("queue") or {}).get("queue_name")
+            filename = pdf_filename(filters, queue_name=queue_name)
+        else:
+            pdf_bytes, _payload = generate_overview_pdf(client, filters)
+            filename = pdf_filename(filters)
+        return Response(
+            pdf_bytes,
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 @ops_bp.route("/api/not-responding")
 def not_responding_api():
     try:

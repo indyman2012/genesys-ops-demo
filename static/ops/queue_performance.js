@@ -4,6 +4,8 @@
   const agentRowsEl = document.getElementById("agent-rows");
   const errorBanner = document.getElementById("error-banner");
   const refreshBtn = document.getElementById("btn-refresh");
+  const exportPdfBtn = document.getElementById("btn-export-pdf");
+  const reportPeriodEl = document.getElementById("report-period");
   const backBtn = document.getElementById("btn-back");
   const divisionSelect = document.getElementById("division-select");
   const daysSelect = document.getElementById("days-select");
@@ -82,6 +84,41 @@
       if (name === current) option.selected = true;
       divisionSelect.appendChild(option);
     });
+  }
+
+  function renderReportPeriod(filters) {
+    if (!filters || !reportPeriodEl) return;
+    const parts = [];
+    if (filters.start_date && filters.end_date) {
+      parts.push(filters.start_date + " through " + filters.end_date);
+    }
+    if (filters.queue_prefix) parts.push("Prefix: " + filters.queue_prefix);
+    if (filters.division) parts.push("Division: " + filters.division);
+    if (!parts.length) {
+      reportPeriodEl.classList.add("hidden");
+      reportPeriodEl.textContent = "";
+      return;
+    }
+    reportPeriodEl.textContent = parts.join(" · ");
+    reportPeriodEl.classList.remove("hidden");
+  }
+
+  function exportPdfUrl() {
+    const params = new URLSearchParams(buildQuery());
+    if (selectedQueueId) params.set("queue_id", selectedQueueId);
+    return "/api/queue-performance/export.pdf?" + params.toString();
+  }
+
+  function exportPdf() {
+    if (loading) return;
+    setError("");
+    exportPdfBtn.disabled = true;
+    exportPdfBtn.textContent = "Exporting…";
+    window.location.href = exportPdfUrl();
+    window.setTimeout(function () {
+      exportPdfBtn.disabled = false;
+      exportPdfBtn.textContent = "Export PDF";
+    }, 2500);
   }
 
   function renderSummary(summary, queueCount) {
@@ -291,6 +328,7 @@
       }
 
       applyFiltersToForm(payload.filters);
+      renderReportPeriod(payload.filters);
       const queue = payload.queue || {};
       document.getElementById("detail-queue-name").textContent = queue.queue_name || queueName;
       renderDetailSummary(queue, payload.agent_count || 0);
@@ -326,6 +364,7 @@
       }
 
       applyFiltersToForm(payload.filters);
+      renderReportPeriod(payload.filters);
       populateDivisions(payload.divisions, payload.filters && payload.filters.division);
       document.getElementById("queue-count").textContent = formatNumber(payload.queue_count);
       renderSummary(payload.summary || {}, payload.queue_count);
@@ -396,6 +435,8 @@
       loadData();
     }
   });
+
+  exportPdfBtn.addEventListener("click", exportPdf);
 
   backBtn.addEventListener("click", showOverview);
 
