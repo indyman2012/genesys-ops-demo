@@ -24,6 +24,15 @@ AGGREGATE_METRICS = (
     "oServiceTarget",
     *TIME_METRICS,
 )
+# Queue-level nOffered/tAbandon have no userId dimension; agent drill-down uses alert metrics.
+AGENT_AGGREGATE_METRICS = (
+    "tAlert",
+    "tNotResponding",
+    "tAnswered",
+    "oServiceLevel",
+    "oServiceTarget",
+    *TIME_METRICS,
+)
 
 
 @dataclass
@@ -48,11 +57,16 @@ class MetricAccumulator:
     wait_ms: int = 0
     wait_count: int = 0
 
-    def absorb(self, bucket_metrics: dict[str, dict[str, Any]]) -> None:
-        self.offered += int(bucket_metrics.get("nOffered", {}).get("count") or 0)
-        self.answered += int(bucket_metrics.get("tAnswered", {}).get("count") or 0)
-        self.abandoned += int(bucket_metrics.get("tAbandon", {}).get("count") or 0)
-        self.short_abandoned += int(bucket_metrics.get("tShortAbandon", {}).get("count") or 0)
+    def absorb(self, bucket_metrics: dict[str, dict[str, Any]], *, agent: bool = False) -> None:
+        if agent:
+            self.offered += int(bucket_metrics.get("tAlert", {}).get("count") or 0)
+            self.answered += int(bucket_metrics.get("tAnswered", {}).get("count") or 0)
+            self.abandoned += int(bucket_metrics.get("tNotResponding", {}).get("count") or 0)
+        else:
+            self.offered += int(bucket_metrics.get("nOffered", {}).get("count") or 0)
+            self.answered += int(bucket_metrics.get("tAnswered", {}).get("count") or 0)
+            self.abandoned += int(bucket_metrics.get("tAbandon", {}).get("count") or 0)
+            self.short_abandoned += int(bucket_metrics.get("tShortAbandon", {}).get("count") or 0)
 
         sl = bucket_metrics.get("oServiceLevel") or {}
         self.sl_numerator += int(sl.get("numerator") or 0)
@@ -322,13 +336,14 @@ def query_conversation_aggregates(
     group_by: list[str],
     queue_id: str | None = None,
     granularity: str = "P1D",
+    metrics: list[str] | None = None,
 ) -> dict[str, Any]:
     body = {
         "interval": interval,
         "granularity": granularity,
         "groupBy": group_by,
         "filter": inbound_voice_filter(queue_id),
-        "metrics": list(AGGREGATE_METRICS),
+        "metrics": list(metrics or AGGREGATE_METRICS),
     }
     return client.request(
         "POST",
@@ -422,6 +437,7 @@ def absorb_aggregate_results(
     per_group: dict[str, MetricAccumulator],
     per_day: dict[str, MetricAccumulator] | None = None,
     allowed_ids: set[str] | None = None,
+    agent: bool = False,
 ) -> None:
     for result in resp.get("results") or []:
         group = result.get("group") if isinstance(result.get("group"), dict) else {}
@@ -435,9 +451,9 @@ def absorb_aggregate_results(
             parsed = bucket_metrics(data_bucket)
             if not parsed:
                 continue
-            bucket_target.absorb(parsed)
+            bucket_target.absorb(parsed, agent=agent)
             if per_day is not None:
-                per_day[day_key(data_bucket.get("interval") or "")].absorb(parsed)
+                per_day[day_key(data_bucket.get("interval") or "")].absorb(parsed, agent=agent)
 
 
 def fetch_queue_detail(
@@ -477,12 +493,14 @@ def fetch_queue_detail(
         group_by=["userId"],
         queue_id=queue_id,
         granularity="P1D",
+        metrics=list(AGENT_AGGREGATE_METRICS),
     )
     per_agent: dict[str, MetricAccumulator] = defaultdict(MetricAccumulator)
     absorb_aggregate_results(
         agent_resp,
         group_key="userId",
         per_group=per_agent,
+        agent=True,
     )
 
     queue_acc = per_queue.get(queue_id) or MetricAccumulator()
