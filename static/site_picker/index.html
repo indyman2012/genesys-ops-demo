@@ -77,8 +77,9 @@
           <div class="inner">
             <p><strong>Sign in with Genesys</strong> is the recommended path. It does not require the bookmarklet or being on a specific tab.</p>
             <p>If sign-in fails, confirm the OAuth redirect URI is registered in Genesys Admin for this site.</p>
-            <p>If no WebRTC phone appears, confirm you have <strong>Telephony &gt; User's phone associations &gt; View</strong> on your role and a WebRTC phone assigned in Genesys.</p>
-            <p>If sign-in works but changing location fails with a permission error, your role also needs phone edit access on the target telephony site(s).</p>
+            <p>If no WebRTC phone appears, confirm a phone named <strong>{Your Name} Web</strong> exists in Genesys with <strong>webRtcUser</strong> linked to you, and Roaming Agent has <strong>Telephony &gt; Phone &gt; Assign</strong> on that phone's current site.</p>
+            <p>If the phone name shows but site change fails, refresh and read the error — a station id was previously mistaken for a phone id; redeploy build <strong>2026-09-15-phone-lookup-fallback-v5</strong> or newer.</p>
+            <p>If sign-in works but changing location fails with a permission error, your role needs <strong>Phone &gt; Assign</strong> on the target telephony site.</p>
           </div>
         </details>
       </div>

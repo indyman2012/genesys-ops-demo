@@ -1,1 +1,1 @@
-web: gunicorn ops_app_demo:app --bind 0.0.0.0:$PORT --timeout 600 --workers 1
+web: gunicorn genesys_toolkit_app:app --bind 0.0.0.0:$PORT --timeout 600 --workers 1

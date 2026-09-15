@@ -39,7 +39,7 @@ Health check: **http://127.0.0.1:8082/agent/health**
 
 ---
 
-## Free hosting (Render) — same pattern as ops demo
+## Free hosting (Render) — same pattern as GenesysToolkit demo
 
 Best balance for a Flask demo: free tier, easy env vars, custom subdomain.
 

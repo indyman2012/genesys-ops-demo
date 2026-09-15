@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core.cli import setup_path, tool_log
 from core.paths import LOGS_DIR, OUTPUTS_DIR, PROJECT_ROOT
+from tools.email.config import default_email_env_file
 
 DEFAULT_WORK_TO = "doug.hendrickson@archwellhealth.com"
 MAX_SCHEDULED_RUNS = 10
@@ -20,7 +21,7 @@ TASK_NAME = "GenesysToolkit-DailyCareNavigatorMultiQueue"
 SCHEDULE_STATE_FILE = LOGS_DIR / "daily_care_navigator_multi_queue_schedule.json"
 REPORT_SCRIPT = PROJECT_ROOT / "tools" / "reporting" / "care_navigator_multi_queue_report.py"
 MAIL_SCRIPT = PROJECT_ROOT / "tools" / "email" / "gmail_send.py"
-ENV_FILE = PROJECT_ROOT / "doug.env"
+ENV_FILE = default_email_env_file()
 
 
 def daily_email(

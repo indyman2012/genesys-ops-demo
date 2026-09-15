@@ -1,4 +1,4 @@
-# Genesys Cloud Ops — Demo Deployment
+# GenesysToolkit — Demo Deployment
 
 Demo instance: **dry run only**. Execute mode is removed from the UI and blocked server-side even if someone tampers with the form.
 
@@ -6,10 +6,16 @@ Demo instance: **dry run only**. Execute mode is removed from the UI and blocked
 
 ```powershell
 Set-Location "C:\Users\douglash\Desktop\Python Files\GenesysCloudToolkit"
-python ops_app_demo.py
+python genesys_toolkit_app.py
 ```
 
 Open: **http://127.0.0.1:8081**
+
+Legacy entry point (same app):
+
+```powershell
+python ops_app_demo.py
+```
 
 Production-style local (full execute):
 
@@ -23,7 +29,8 @@ Open: **http://127.0.0.1:8080**
 
 | File | Port | Execute allowed |
 |------|------|-----------------|
-| `ops_app_demo.py` | 8081 | No — preview only |
+| `genesys_toolkit_app.py` | 8081 | No — preview only (**canonical**) |
+| `ops_app_demo.py` | 8081 | No — shim to `genesys_toolkit_app` |
 | `ops_app.py` | 8080 | Yes — with safeguards |
 
 Demo also hides the **Delete Sites / Locations** tool (no reliable dry-run).
@@ -40,7 +47,7 @@ Best balance for a Flask demo: free tier, easy env vars, custom subdomain.
 
 - Sign up: https://render.com
 - New **Web Service** → connect Git repo (or manual deploy)
-- **Start command:** `gunicorn ops_app_demo:app --bind 0.0.0.0:$PORT --timeout 600`
+- **Start command:** `gunicorn genesys_toolkit_app:app --bind 0.0.0.0:$PORT --timeout 600`
 - **Environment variables** (Dashboard → Environment) — **no `client.env` file on Render**:
   - `OPS_DEMO_MODE=1`
   - `GENESYS_CLIENT_ID` / `GENESYS_CLIENT_SECRET` — **Client Credentials** OAuth client (Queue Performance, Not Responding, ops tools)
@@ -49,9 +56,12 @@ Best balance for a Flask demo: free tier, easy env vars, custom subdomain.
   - `FLASK_SECRET_KEY=...` (random string — site picker sessions)
 
 These are usually **two different OAuth clients** in Genesys Admin. The agent client cannot substitute for the admin client.
+
 - Free tier sleeps after ~15 min idle (cold start ~30s on first visit)
 
-A starter spec is in `render.demo.yaml`.
+A starter spec is in `render.demo.yaml` (service name: `genesys-toolkit`).
+
+**Migration from `genesys-ops-demo`:** update Render start command to `genesys_toolkit_app:app`. The old `ops_app_demo:app` shim still works if you defer the change.
 
 ### 2. PythonAnywhere
 
@@ -59,7 +69,7 @@ Easiest if you prefer a Python-focused host and don’t mind `yourname.pythonany
 
 - Sign up: https://www.pythonanywhere.com (free tier)
 - Upload project or clone from Git
-- Create a Flask web app pointing at `ops_app_demo.py`
+- Create a Flask web app pointing at `genesys_toolkit_app.py`
 - Set env vars in the WSGI config or a `.env` loader
 - Free tier: one web app, limited CPU — fine for demos
 
@@ -81,7 +91,7 @@ More control, small free allowance, good if you already use containers.
 
 1. Use a **separate OAuth client** in Genesys with **read-only** scopes where possible.
 2. Never commit `client.env` — use host environment variables only.
-3. Deploy **`ops_app_demo.py`** only, not `ops_app.py`.
+3. Deploy **`genesys_toolkit_app.py`** only, not `ops_app.py`.
 4. Set `OPS_DEMO_MODE=1` on the host (demo entry point sets this automatically).
 
 ### Queue Performance sign-in

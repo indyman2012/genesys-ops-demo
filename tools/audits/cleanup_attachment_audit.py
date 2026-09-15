@@ -169,6 +169,10 @@ class GenesysClient:
             resp = self.request("GET", path, params=params)
             payload = resp.json()
 
+            if isinstance(payload, list):
+                results.extend(item for item in payload if isinstance(item, dict))
+                break
+
             if entity_key:
                 page_items = payload.get(entity_key, [])
             else:
@@ -184,8 +188,8 @@ class GenesysClient:
 
             results.extend(page_items)
 
-            page_count = payload.get("pageCount")
-            total = payload.get("total")
+            page_count = payload.get("pageCount") if isinstance(payload, dict) else None
+            total = payload.get("total") if isinstance(payload, dict) else None
             if page_count is not None:
                 if page_number >= int(page_count):
                     break

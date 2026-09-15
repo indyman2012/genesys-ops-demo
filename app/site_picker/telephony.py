@@ -146,14 +146,6 @@ def _merge_phone_site_from_filter(
     return merged
 
 
-def _phone_from_station(station: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": station.get("id"),
-        "name": station.get("name"),
-        "site": {},
-    }
-
-
 def _fetch_phone_by_id(access_token: str, phone_id: str) -> dict[str, Any] | None:
     return _try_user_request(
         access_token,
@@ -163,16 +155,84 @@ def _fetch_phone_by_id(access_token: str, phone_id: str) -> dict[str, Any] | Non
     )
 
 
-def _find_phone_via_user_station(access_token: str) -> dict[str, Any] | None:
+def _find_phone_by_name(access_token: str, phone_name: str) -> dict[str, Any] | None:
+    expected_name = phone_name.strip()
+    if not expected_name:
+        return None
+
+    payload = _try_user_request(
+        access_token,
+        "GET",
+        "/api/v2/telephony/providers/edges/phones",
+        params={
+            "name": expected_name,
+            "expand": "site",
+            "pageSize": 25,
+            "pageNumber": 1,
+        },
+    )
+    entities = (payload or {}).get("entities") or []
+    if len(entities) == 1:
+        return entities[0]
+
+    expected_key = normalize_phone_key(expected_name)
+    matches = [
+        phone
+        for phone in entities
+        if normalize_phone_key(safe_str(phone.get("name"))) == expected_key
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+def _find_phone_via_station_record(
+    access_token: str,
+    station: dict[str, Any],
+    *,
+    user_name: str = "",
+) -> dict[str, Any] | None:
+    """Resolve a station record to an edge phone — never return a station id as phone id."""
+    station_id = safe_str(station.get("id"))
+    if station_id:
+        phone = _fetch_phone_by_id(access_token, station_id)
+        if phone:
+            return phone
+
+    for candidate in (
+        safe_str(station.get("name")),
+        f"{user_name.strip()} Web" if user_name.strip() else "",
+    ):
+        if not candidate:
+            continue
+        phone = _find_phone_by_name(access_token, candidate)
+        if phone:
+            return phone
+    return None
+
+
+def _find_phone_via_user_station(
+    access_token: str,
+    *,
+    user_name: str = "",
+) -> dict[str, Any] | None:
     payload = _try_user_request(access_token, "GET", "/api/v2/users/stations/me")
     station = _pick_user_station(payload if isinstance(payload, dict) else None)
     if not station:
         return None
-    phone = _fetch_phone_by_id(access_token, safe_str(station.get("id")))
-    return phone or _phone_from_station(station)
+    return _find_phone_via_station_record(
+        access_token,
+        station,
+        user_name=user_name,
+    )
 
 
-def _find_phone_via_webrtc_station(access_token: str, user_id: str) -> dict[str, Any] | None:
+def _find_phone_via_webrtc_station(
+    access_token: str,
+    user_id: str,
+    *,
+    user_name: str = "",
+) -> dict[str, Any] | None:
     payload = _try_user_request(
         access_token,
         "GET",
@@ -186,9 +246,11 @@ def _find_phone_via_webrtc_station(access_token: str, user_id: str) -> dict[str,
     entities = (payload or {}).get("entities") or []
     if not entities:
         return None
-    station = entities[0]
-    phone = _fetch_phone_by_id(access_token, safe_str(station.get("id")))
-    return phone or _phone_from_station(station)
+    return _find_phone_via_station_record(
+        access_token,
+        entities[0],
+        user_name=user_name,
+    )
 
 
 def _find_phone_via_phone_api(
@@ -214,30 +276,8 @@ def _find_phone_via_phone_api(
         if entities:
             return entities[0]
 
-    expected_name = f"{user_name.strip()} Web"
-    payload = _try_user_request(
-        access_token,
-        "GET",
-        "/api/v2/telephony/providers/edges/phones",
-        params={
-            "name": expected_name,
-            "expand": "site",
-            "pageSize": 25,
-            "pageNumber": 1,
-        },
-    )
-    entities = (payload or {}).get("entities") or []
-    if len(entities) == 1:
-        return entities[0]
-
-    expected_key = normalize_phone_key(expected_name)
-    matches = [
-        phone
-        for phone in entities
-        if normalize_phone_key(safe_str(phone.get("name"))) == expected_key
-    ]
-    if len(matches) == 1:
-        return matches[0]
+    if user_name.strip():
+        return _find_phone_by_name(access_token, f"{user_name.strip()} Web")
     return None
 
 
@@ -268,6 +308,20 @@ def fetch_sites_with_user_token(access_token: str) -> list[dict[str, Any]]:
     return sites
 
 
+def _admin_phone_record(user_id: str) -> dict[str, Any] | None:
+    fallback = fetch_phone_site_admin_fallback(user_id)
+    if not fallback.get("id"):
+        return None
+    site_id = safe_str(fallback.get("site_id"))
+    site_name = safe_str(fallback.get("site_name"))
+    site = {"id": site_id, "name": site_name} if site_id or site_name else {}
+    return {
+        "id": fallback["id"],
+        "name": fallback.get("name"),
+        "site": site,
+    }
+
+
 def find_user_web_phone(
     access_token: str,
     *,
@@ -293,8 +347,14 @@ def find_user_web_phone(
 
     # Agent-friendly station paths — avoid the full phone inventory API.
     for finder in (
-        lambda: _find_phone_via_user_station(access_token),
-        lambda: _find_phone_via_webrtc_station(access_token, user_id) if user_id else None,
+        lambda: _find_phone_via_user_station(access_token, user_name=user_name),
+        lambda: _find_phone_via_webrtc_station(
+            access_token,
+            user_id,
+            user_name=user_name,
+        )
+        if user_id
+        else None,
         lambda: _find_phone_via_phone_api(
             access_token,
             user_id=user_id,
@@ -302,9 +362,30 @@ def find_user_web_phone(
         ),
     ):
         phone = finder()
-        if phone:
+        if phone and safe_str(phone.get("id")):
             return _merge_phone_site_from_filter(access_token, user_id, phone)
     return None
+
+
+def resolve_user_web_phone(
+    access_token: str,
+    *,
+    user_id: str,
+    user_name: str,
+) -> tuple[dict[str, Any] | None, str]:
+    """Return (phone, source) where source is user, admin, or empty."""
+    phone = find_user_web_phone(
+        access_token,
+        user_id=user_id,
+        user_name=user_name,
+    )
+    if phone and safe_str(phone.get("id")):
+        return phone, "user"
+    if user_id:
+        admin_phone = _admin_phone_record(user_id)
+        if admin_phone:
+            return admin_phone, "admin"
+    return None, ""
 
 
 def get_phone_detail(access_token: str, phone_id: str) -> dict[str, Any] | None:
@@ -352,7 +433,7 @@ def _fetch_phone_for_update(
     return phone if phone and phone.get("lines") else None
 
 
-SITE_PICKER_BUILD = "2026-06-29-agent-phone-change-v4"
+SITE_PICKER_BUILD = "2026-09-15-phone-lookup-fallback-v5"
 
 
 def _admin_credentials_available() -> bool:
@@ -447,6 +528,25 @@ def phone_summary(
         "site_id": site_id,
         "site_name": site_name,
     }
+
+
+def phone_not_found_message(*, user_name: str, admin_available: bool) -> str:
+    expected = f"{user_name.strip()} Web" if user_name.strip() else "{Your Name} Web"
+    lines = [
+        f"No WebRTC phone found for your account (expected name like \"{expected}\").",
+        "Confirm Genesys Admin shows a Web phone linked to you (webRtcUser) or a station association.",
+    ]
+    if admin_available:
+        lines.append(
+            "Your sign-in worked, but telephony phone APIs returned nothing with your agent token. "
+            "Ensure Roaming Agent includes Telephony > Phone > Assign on your phone's current site."
+        )
+    else:
+        lines.append(
+            "Server admin credentials are not configured here, so phone lookup cannot fall back. "
+            "Ask IT to verify Roaming Agent phone permissions or add GENESYS_CLIENT_ID/SECRET on the host."
+        )
+    return " ".join(lines)
 
 
 def fetch_phone_site_admin_fallback(user_id: str) -> dict[str, str]:

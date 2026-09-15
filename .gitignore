@@ -1,16 +1,31 @@
 # Secrets — use Render environment variables instead
 client.env
+email.env
 *.env
 .env
 gmail_credentials.json
 gmail_token.json
 
-# Tool output
+# Tool output and runtime artifacts
 outputs/
 uploads/
 payloads/
 logs/
 _archive/
+
+# Local audit / validation artifacts (repo root)
+validation_results.json
+*_results.json
+audit_*.csv
+audit_*.json
+manual_review.csv
+ready_to_apply.csv
+permissions.csv
+roles.csv
+users.csv
+user_role_division_map.csv
+wrapup_queue_assignment_report.csv
+callback_audit_*.csv
 
 # Python
 __pycache__/

@@ -183,6 +183,8 @@ def health():
         org = client.request("GET", "/api/v2/organizations/me")
         return jsonify({
             "ok": True,
+            "app": "GenesysToolkit",
+            "service": "ops-console",
             "demo_mode": _demo_mode(),
             "organization": org.get("name"),
             "region": client.region,
@@ -195,6 +197,8 @@ def health():
     except Exception as exc:
         return jsonify({
             "ok": False,
+            "app": "GenesysToolkit",
+            "service": "ops-console",
             "error": str(exc),
             "env_probe": probe,
             "credential_source": credential_source(),
@@ -316,7 +320,7 @@ def create_app(*, demo_mode: bool = False):
         static_folder=str(PROJECT_ROOT / "static"),
     )
     app.config["DEMO_MODE"] = demo_mode or is_demo_mode()
-    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "genesys-ops-demo" if demo_mode else "genesys-ops-local")
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "genesys-toolkit-demo" if demo_mode else "genesys-toolkit-local")
     on_render = os.environ.get("RENDER") == "true"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
     app.config["SESSION_COOKIE_HTTPONLY"] = True

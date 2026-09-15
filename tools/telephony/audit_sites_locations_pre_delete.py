@@ -127,6 +127,18 @@ def safe_get(session: requests.Session, url: str, label: str) -> tuple[Dict[str,
         return None, err
 
 
+def resolve_header(fieldnames: list[str] | None, *candidates: str) -> str | None:
+    headers = [h.strip() for h in (fieldnames or []) if h]
+    lower_map = {h.casefold(): h for h in headers}
+    for candidate in candidates:
+        if candidate in headers:
+            return candidate
+        hit = lower_map.get(candidate.casefold())
+        if hit:
+            return hit
+    return None
+
+
 def load_keep_lists(csv_file: str) -> tuple[set[str], set[str]]:
     keep_sites: set[str] = set()
     keep_locations: set[str] = set()
@@ -134,15 +146,18 @@ def load_keep_lists(csv_file: str) -> tuple[set[str], set[str]]:
     with open(csv_file, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         headers_found = [h.strip() for h in (reader.fieldnames or [])]
+        site_col = resolve_header(reader.fieldnames, SITE_COL, "SiteName", "Site")
+        location_col = resolve_header(reader.fieldnames, LOCATION_COL, "LocationName", "Location")
 
-        if SITE_COL not in headers_found or LOCATION_COL not in headers_found:
+        if not site_col or not location_col:
             raise ValueError(
-                f"CSV must contain columns: {SITE_COL}, {LOCATION_COL}. Found: {headers_found}"
+                f"CSV must contain site and location columns "
+                f"({SITE_COL}/{LOCATION_COL} or SiteName/LocationName). Found: {headers_found}"
             )
 
         for row in reader:
-            site = (row.get(SITE_COL) or "").strip()
-            location = (row.get(LOCATION_COL) or "").strip()
+            site = (row.get(site_col) or "").strip()
+            location = (row.get(location_col) or "").strip()
             if site:
                 keep_sites.add(site)
             if location:

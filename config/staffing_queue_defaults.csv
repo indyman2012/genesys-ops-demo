@@ -1,0 +1,2 @@
+queue_family_prefix,service_level_pct,service_level_seconds,shrinkage_pct,min_coverage_fte,notes
+Patient Services,80,60,30,1,Phase 1 default — PS queues only

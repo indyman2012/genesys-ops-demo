@@ -65,6 +65,17 @@ TOOL_HELP: dict[str, str] = {
         "Creates default outbound route records for sites in your CSV. "
         "Dry run shows which routes would be created per site."
     ),
+    "market_site_setup": (
+        "End-to-end market opening: creates a location with ELIN, a 6-character telephony site, "
+        "and a Default Outbound Route with trunk assigned and enabled. Post-apply verification "
+        "fails the run if the route is not dialable (CLEMKT lesson). Optional HQ phone moves "
+        "by queue name or CSV. Dry run previews payloads without creating infrastructure."
+    ),
+    "outbound_route_health_audit": (
+        "Read-only scan of every telephony site (or a CSV subset) for Default Outbound Route "
+        "presence, enabled state, and external trunk assignment. Flags MISSING, DISABLED, and "
+        "NO_TRUNK sites. Run monthly or after market site setup."
+    ),
     "update_outbound_routes": (
         "Enables and configures existing outbound routes with the correct trunk assignment. "
         "Dry run previews PUT payloads per site."
@@ -113,6 +124,46 @@ TOOL_HELP: dict[str, str] = {
     "cleanup_attachment_audit": (
         "Finds Genesys sites and locations not on your authoritative keep-list and summarizes attached phones. "
         "Read-only Excel workbook for cleanup planning."
+    ),
+    "ma_provisioning_audit": (
+        "Scans Medical Assistant users for missing Communicate - User role and/or assigned phone. "
+        "Read-only CSV for onboarding hygiene."
+    ),
+    "sales_hq_phone_audit": (
+        "Lists Sales queue members whose Web phone is still at Headquarters vs the market site implied by joined queues. "
+        "Read-only — run before the HQ Phone Workflow."
+    ),
+    "station_name_audit": (
+        "Finds stations whose name does not match the {User Name} Web convention. "
+        "Read-only CSV split into mismatch, OK, and unknown-user rows."
+    ),
+    "org_cleanup_audit": (
+        "Org-wide orphan inventory across queues, sites, routes, flows, and related objects. "
+        "Read-only Excel workbook for leadership cleanup planning."
+    ),
+    "other_phone_site_mismatch_audit": (
+        "Compares Teams OTHER phone area codes to WEB phone site market codes using area_code_markets.csv. "
+        "Read-only Excel workbook; HQ-area-code staff at Headquarters are informational only."
+    ),
+    "hq_phone_reassign_by_queue": (
+        "Step 1 — HQ Phone Workflow. Moves unambiguous HQ WebRTC phones to center sites based on joined=true queue "
+        "membership. Dry run writes hq_phone_reassign_by_queue_*.csv and e911 review CSV."
+    ),
+    "export_hq_phone_hr_template": (
+        "Step 2 — HQ Phone Workflow. Converts the Step 1 audit CSV into an HR site-assignment template with "
+        "assigned_site_code column for manual review."
+    ),
+    "apply_hq_phone_site_assignments": (
+        "Step 3 — HQ Phone Workflow. Applies HR-reviewed assigned_site_code values to move HQ phones to market sites. "
+        "Dry run validates site codes and shows planned moves."
+    ),
+    "ma_telephony_align": (
+        "Assigns next available WORK extension and sets Primary Voice to the user's Web phone for Medical Assistants. "
+        "Dry run reports gaps and planned changes without PATCHing users."
+    ),
+    "set_site_caller_id_from_location": (
+        "Sets each site's callerId from its associated location emergency number in E.164 format. "
+        "Dry run scans sites and reports current vs target caller ID."
     ),
 }
 

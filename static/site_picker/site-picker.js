@@ -49,7 +49,8 @@
 
   function showResult(kind, message) {
     var el = $("result");
-    el.className = "result show " + (kind === "ok" ? "ok" : "err");
+    var css = kind === "ok" ? "ok" : kind === "info" ? "info" : "err";
+    el.className = "result show " + css;
     el.textContent = message;
   }
 
@@ -225,7 +226,11 @@
       }
       if (phoneMeta) phoneMeta.classList.remove("phone-meta-empty");
     } else {
-      if (phoneNameEl) phoneNameEl.textContent = "No WebRTC phone found for your account.";
+      if (phoneNameEl) {
+        phoneNameEl.textContent = state.phone_error
+          ? "WebRTC phone not loaded"
+          : "No WebRTC phone found for your account.";
+      }
       if (phoneSiteEl) phoneSiteEl.textContent = "—";
       if (phoneMeta) phoneMeta.classList.add("phone-meta-empty");
     }
@@ -252,8 +257,15 @@
       $("btn-change").disabled = !(phone && phone.id);
     }
 
-    if (state.error) {
+    if (state.phone_error) {
+      showResult("err", state.phone_error);
+    } else if (state.error) {
       showResult("err", state.error);
+    } else if (state.phone_source === "admin") {
+      showResult(
+        "info",
+        "Phone loaded via server lookup. Site changes still use your permissions first, then server fallback if needed."
+      );
     } else {
       clearResult();
     }

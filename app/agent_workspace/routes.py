@@ -176,6 +176,7 @@ def health():
 
     return jsonify({
         "ok": True,
+        "app": "GenesysToolkit",
         "demo_mode": bool(current_app.config.get("DEMO_MODE")),
         "authenticated": _is_authenticated(),
         "service": "agent-workspace",

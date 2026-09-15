@@ -24,12 +24,19 @@ import csv
 import json
 import os
 import random
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from core.csv_utils import csv_field, normalize_csv_row
 
 
 DEFAULT_REGION = "usw2.pure.cloud"
@@ -190,7 +197,7 @@ def read_csv_rows(csv_file: str) -> List[Dict[str, str]]:
         for row in reader:
             cleaned = {str(k).strip(): (str(v).strip() if v is not None else "") for k, v in row.items()}
             if any(cleaned.values()):
-                rows.append(cleaned)
+                rows.append(normalize_csv_row(cleaned))
         return rows
 
 
@@ -332,9 +339,9 @@ def main() -> int:
     trunk_cache: Dict[str, Dict[str, Any]] = {}
 
     for i, row in enumerate(rows, start=1):
-        site_name = row.get("site_name", "").strip()
-        route_name = row.get("route_name", "").strip() or args.default_route_name
-        trunk_name = row.get("trunk_name", "").strip() or args.default_trunk_name
+        site_name = csv_field(row, "site_name")
+        route_name = csv_field(row, "route_name") or args.default_route_name
+        trunk_name = csv_field(row, "trunk_name") or args.default_trunk_name
         result: Dict[str, Any] = {"row": i, "site_name": site_name, "route_name": route_name, "trunk_name": trunk_name}
 
         try:

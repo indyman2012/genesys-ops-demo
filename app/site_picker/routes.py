@@ -33,12 +33,13 @@ from app.agent_workspace.oauth import (
     use_pkce,
 )
 from app.site_picker.telephony import (
+    _admin_credentials_available,
     change_phone_site,
     enrich_phone_site_name,
-    fetch_phone_site_admin_fallback,
     fetch_sites_with_user_token,
-    find_user_web_phone,
+    phone_not_found_message,
     phone_summary,
+    resolve_user_web_phone,
 )
 from core.config import get_apps_host, get_login_host
 from core.genesys_client import GenesysError, safe_str
@@ -139,9 +140,11 @@ def _load_state() -> dict[str, Any]:
     except GenesysError as exc:
         error = f"Could not load sites: {exc}"
 
+    phone_error = ""
+    phone_source = ""
     try:
         token = _access_token()
-        web_phone = find_user_web_phone(
+        web_phone, phone_source = resolve_user_web_phone(
             token,
             user_id=str(user["id"]),
             user_name=str(user["name"] or ""),
@@ -151,16 +154,11 @@ def _load_state() -> dict[str, Any]:
             phone_summary(web_phone, sites_by_id=sites_by_id),
             sites_by_id=sites_by_id,
         )
-        if phone and not phone.get("site_id"):
-            fallback = fetch_phone_site_admin_fallback(str(user["id"]))
-            if fallback:
-                phone = {
-                    **phone,
-                    "id": phone.get("id") or fallback.get("id"),
-                    "name": phone.get("name") or fallback.get("name"),
-                    "site_id": fallback.get("site_id") or phone.get("site_id"),
-                    "site_name": fallback.get("site_name") or phone.get("site_name"),
-                }
+        if not phone or not phone.get("id"):
+            phone_error = phone_not_found_message(
+                user_name=str(user["name"] or ""),
+                admin_available=_admin_credentials_available(),
+            )
     except Exception as exc:
         if not error:
             error = f"Could not load phone: {exc}"
@@ -174,6 +172,10 @@ def _load_state() -> dict[str, Any]:
         "sites": sites,
         "apps_url": get_apps_host(),
     }
+    if phone_source:
+        state["phone_source"] = phone_source
+    if phone_error:
+        state["phone_error"] = phone_error
     if error:
         state["error"] = error
     return state
@@ -198,7 +200,12 @@ def assets(filename: str):
 
 @site_picker_bp.route("/health")
 def health():
-    return jsonify({"ok": True, "service": "site-picker", "authenticated": _is_authenticated()})
+    return jsonify({
+        "ok": True,
+        "app": "GenesysToolkit",
+        "service": "site-picker",
+        "authenticated": _is_authenticated(),
+    })
 
 
 @site_picker_bp.route("/api/setup")
@@ -371,11 +378,20 @@ def api_change_site():
     token = _access_token()
 
     try:
-        web_phone = find_user_web_phone(token, user_id=user_id, user_name=user_name)
-        if not web_phone:
-            return jsonify({"error": "No WebRTC phone found for your user account."}), 404
+        web_phone, phone_source = resolve_user_web_phone(
+            token,
+            user_id=user_id,
+            user_name=user_name,
+        )
+        phone_id = safe_str((web_phone or {}).get("id"))
+        if not phone_id:
+            return jsonify({
+                "error": phone_not_found_message(
+                    user_name=user_name,
+                    admin_available=_admin_credentials_available(),
+                ),
+            }), 404
 
-        phone_id = str(web_phone.get("id") or "")
         allowed = {s.get("id") for s in fetch_sites_with_user_token(token)}
         if site_id not in allowed:
             return jsonify({"error": "You do not have permission for that site."}), 403
@@ -386,12 +402,14 @@ def api_change_site():
             for s in fetch_sites_with_user_token(token)
             if s.get("id")
         }
+        refreshed, _source = resolve_user_web_phone(
+            token,
+            user_id=user_id,
+            user_name=user_name,
+        )
         updated = enrich_phone_site_name(
             token,
-            phone_summary(
-                find_user_web_phone(token, user_id=user_id, user_name=user_name),
-                sites_by_id=sites_by_id,
-            ),
+            phone_summary(refreshed or web_phone, sites_by_id=sites_by_id),
             sites_by_id=sites_by_id,
         )
         if not updated or not updated.get("site_id"):
@@ -405,11 +423,10 @@ def api_change_site():
         elif not updated.get("site_name"):
             target = sites_by_id.get(site_id) or {}
             updated = {**updated, "site_name": safe_str(target.get("name"))}
-        if updated and not updated.get("site_id"):
-            fallback = fetch_phone_site_admin_fallback(user_id)
-            if fallback:
-                updated = {**updated, **{k: v for k, v in fallback.items() if v}}
-        return jsonify({"ok": True, "phone": updated})
+        response: dict[str, Any] = {"ok": True, "phone": updated}
+        if phone_source:
+            response["phone_source"] = phone_source
+        return jsonify(response)
     except GenesysError as exc:
         return jsonify({"error": str(exc)}), 502
     except Exception as exc:

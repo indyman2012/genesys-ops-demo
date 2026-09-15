@@ -91,20 +91,35 @@ def get_all(session: requests.Session, url: str) -> List[Dict[str, Any]]:
     return results
 
 
+def resolve_header(fieldnames: list[str] | None, *candidates: str) -> str | None:
+    headers = [h.strip() for h in (fieldnames or []) if h]
+    lower_map = {h.casefold(): h for h in headers}
+    for candidate in candidates:
+        if candidate in headers:
+            return candidate
+        hit = lower_map.get(candidate.casefold())
+        if hit:
+            return hit
+    return None
+
+
 def read_candidate_sites(path: str) -> Tuple[List[Dict[str, str]], set[str]]:
     rows: List[Dict[str, str]] = []
     site_ids: set[str] = set()
 
     with open(path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
-        required = {"site_name", "id"}
-        headers = set(reader.fieldnames or [])
-        if not required.issubset(headers):
-            raise ValueError(f"CSV must contain headers {sorted(required)}. Found: {sorted(headers)}")
+        headers = [h.strip() for h in (reader.fieldnames or []) if h]
+        site_col = resolve_header(reader.fieldnames, "site_name", "SiteName", "Site")
+        id_col = resolve_header(reader.fieldnames, "id", "Id", "site_id", "SiteId")
+        if not site_col or not id_col:
+            raise ValueError(
+                f"CSV must contain site and id columns (site_name/id or SiteName/SiteId). Found: {sorted(headers)}"
+            )
 
         for row in reader:
-            site_id = (row.get("id") or "").strip()
-            site_name = (row.get("site_name") or "").strip()
+            site_id = (row.get(id_col) or "").strip()
+            site_name = (row.get(site_col) or "").strip()
             if not site_id:
                 continue
             rows.append({"site_name": site_name, "id": site_id})

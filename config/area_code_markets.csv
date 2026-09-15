@@ -1,0 +1,22 @@
+market,city,area_codes,notes
+HQ,Headquarters,"615,629",Nashville HQ; mismatch when WEB phone site is not HQ
+BHM,Birmingham,"205,659",Central/western AL overlay
+CLE,Cleveland,"216,440,436",436 overlay on 440 (2024); 216 is Cleveland proper
+CLT,Charlotte,"704,980",
+DEN,Denver,"303,720,983",
+GBO,Greensboro,"336,743",
+JAX,Jacksonville,904,
+KSC,Kansas City,"816,913,975",816/975 MO side; 913 KS side
+LIT,Little Rock,"501,870",870 covers broader AR outside Little Rock proper
+LNK,Lincoln,"402,531",402/531 shared with Omaha market — site prefix disambiguates
+LVS,Las Vegas,"702,725",
+MGM,Montgomery,334,
+MKE,Milwaukee,"414,262",262 surrounds Milwaukee metro
+OKC,Oklahoma City,"405,572",
+OMH,Omaha,"402,531",402/531 shared with Lincoln market — site prefix disambiguates
+PHL,Philadelphia,"215,267,445",
+PHX,Phoenix,"480,602,623",
+STL,St. Louis,"314,557,636",636 is STL suburban overlay
+TCS,Tucson,520,
+TMP,Tampa Bay,"813,656,727,941,239",941 SW FL gulf coast; 239 SW FL (Fort Myers/Naples)
+TUL,Tulsa,"918,539",

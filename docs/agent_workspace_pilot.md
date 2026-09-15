@@ -41,7 +41,7 @@ Replace the dense Genesys Agent UI for a **voice-first pilot cohort** with the A
 - [ ] Create **dedicated OAuth client** in Genesys (authorization code + PKCE, agent-scoped roles)
 - [ ] **Local dev:** run `agent_app.py` on `127.0.0.1:8083` with live OAuth callback (`http://localhost:8083/agent/oauth/callback`)
 - [ ] **Render pilot:** deploy `agent_app.py` (not demo) with `AGENT_DEMO_MODE=0` + agent OAuth secrets
-- [ ] Register Render redirect URI on OAuth client: `https://genesys-ops-demo-3.onrender.com/agent/oauth/callback` (or dedicated pilot service)
+- [ ] Register Render redirect URI on OAuth client: `https://genesys-toolkit.onrender.com/agent/oauth/callback` (or your Render service URL)
 - [ ] Secrets: `GENESYS_AGENT_CLIENT_ID`, `GENESYS_AGENT_CLIENT_SECRET`, `FLASK_SECRET_KEY`
 - [ ] Pilot queue allowlist (2–4 Patient Services centers)
 - [ ] Azure AD SSO — **deferred** until App Service if pilot proceeds

@@ -1,0 +1,6 @@
+title_contains,expected_phone_pct,include_in_burden,notes
+Care Navigator,20,true,ArchWell front-line phone expectation
+Front Desk,20,true,Default front desk expectation
+Medical Assistant,20,true,
+Patient Services,20,true,General PS staff
+Center Administrator,10,false,Supervisor — excluded from ABI ranking

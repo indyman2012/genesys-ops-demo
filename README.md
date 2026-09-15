@@ -1,41 +1,62 @@
-# Genesys Cloud Toolkit
+# GenesysToolkit
 
-Unified ops tools and analytics for Genesys Cloud (ArchWell Health org).
+Python toolkit for Genesys Cloud operations at ArchWell Health: **CLI scripts** for telephony, queues, users/roles, and audits, plus a **Flask Ops web app** for supervised dry-run and (local) execute workflows.
 
-## Ops Console (Flask UI)
+Repository folder: `GenesysCloudToolkit` (historical name). Product branding: **GenesysToolkit**.
 
-Unified localhost runner for all ops tools:
+## Quick start
 
 ```powershell
-cd "C:\Users\douglash\Desktop\Python Files\GenesysCloudToolkit"
+Set-Location "C:\Users\douglash\Desktop\Python Files\GenesysCloudToolkit"
+pip install -r requirements.txt
+```
+
+Copy OAuth credentials to `client.env` (local only — never commit). Validate:
+
+```powershell
+python -m core.verify_auth
+```
+
+## Web app entry points
+
+| Entry point | Port | Execute | Use case |
+|-------------|------|---------|----------|
+| `genesys_toolkit_app.py` | 8081 | No — dry run only | **Canonical demo** (Render / Azure preview) |
+| `ops_app_demo.py` | 8081 | No | Backward-compatible shim → `genesys_toolkit_app` |
+| `ops_app.py` | 8080 | Yes — with safeguards | Local production-style runner |
+| `agent_app_demo.py` | 8082 | N/A | Agent Workspace pilot (simulated) |
+
+**Demo (recommended for preview hosting):**
+
+```powershell
+python genesys_toolkit_app.py
+```
+
+Open **http://127.0.0.1:8081** — Ops Console, Queue Performance, Not Responding, Site Picker (`/site-picker`), Agent Workspace (`/agent`).
+
+**Local execute mode:**
+
+```powershell
 python ops_app.py
 ```
 
-Open: **http://127.0.0.1:8080**
+Open **http://127.0.0.1:8080**
 
-**Demo (preview only, no execute):** see [README-DEMO.md](README-DEMO.md) — `python ops_app_demo.py` on port **8081**.
+Deployment details: [README-DEMO.md](README-DEMO.md) · Agent pilot: [README-AGENT-DEMO.md](README-AGENT-DEMO.md)
 
-## Agent Workspace (Flask UI — demo)
+Health check: **http://127.0.0.1:8081/health**
 
-Simplified agent shell for new hires: queue-only dial, collaborate chat, membership, and activity panels.
+## Ops Console features
 
-```powershell
-cd "C:\Users\douglash\Desktop\Python Files\GenesysCloudToolkit"
-python agent_app_demo.py
-```
-
-Open: **http://127.0.0.1:8082/agent**
-
-Full setup and Render deploy: [README-AGENT-DEMO.md](README-AGENT-DEMO.md)
-
-- Tool picker grouped by category (dropdown)
-- Dynamic forms with API-backed dropdowns (divisions, queues, groups, queue prefixes)
+- Tool picker grouped by category (Audits, Telephony, Queues, Users/Roles, …)
+- Dynamic forms with API-backed dropdowns (divisions, queues, groups)
 - CSV template download where available
-- **Dry run by default** — mutating tools show an execute section that must be explicitly enabled
-- Execute requires typing `EXECUTE` + a final confirmation dialog
+- **Dry run by default** — mutating tools require explicit execute confirmation
 - Streaming log output with color-coded lines
+- Queue Performance dashboard (OAuth supervisor login)
+- Not Responding agent monitor
 
-## Ops tools rework (current focus)
+## CLI tools
 
 All ops tools share a common foundation:
 
@@ -47,40 +68,7 @@ All ops tools share a common foundation:
 | `core/cli.py` | `--apply` dry-run pattern, CSV I/O, logging |
 | `core/verify_auth.py` | Credential smoke test |
 
-**Validate credentials:**
-```powershell
-cd "C:\Users\douglash\Desktop\Python Files\GenesysCloudToolkit"
-python -m core.verify_auth
-```
-
-**Standard tool pattern:** dry run by default, pass `--apply` to make changes.
-
-## Tool status
-
-| Category | Status |
-|----------|--------|
-| **Queues** | Reworked — shared client, fixed paths, dry-run logging |
-| **Users/Roles** | Partial — `license_counts`, `role_assign` env fixed; others pending |
-| **Telephony** | Partial — `patch_location_elin` reworked; others pending |
-| **Audits** | Pending — still use legacy auth patterns |
-| **Dashboards/MySQL** | On hold until ops tools validated |
-
-## Folder structure
-
-```
-GenesysCloudToolkit/
-├── core/                 # Shared library (start here)
-├── tools/
-│   ├── telephony/
-│   ├── users_roles/
-│   ├── queues/           # Reworked
-│   └── audits/
-├── tool_registry.py      # Tool catalog with corrected paths
-├── client.env            # OAuth credentials
-└── outputs/ payloads/    # Tool output (auto-created)
-```
-
-## Example commands
+**Standard pattern:** dry run by default, pass `--apply` to make changes.
 
 ```powershell
 # Read-only
@@ -92,13 +80,58 @@ python tools\queues\queue_joined_true.py --user-email user@example.com --queue-p
 
 # Apply
 python tools\telephony\patch_location_elin.py --apply
-python tools\queues\queue_joined_true.py --user-email user@example.com --queue-prefix "NCM_" --apply
 ```
 
-## Next steps
+Tool catalog: `app/tool_specs.py` (web) · `tool_registry.py` (CLI paths)
 
-1. Finish telephony tool migration to `core.*`
-2. Finish users_roles + audits migration
-3. Rework `wrapupcodes_apply.py` (largest queue tool)
-4. Wire unified CLI entry point (`python -m tools.run <tool-id>`)
-5. Return to dashboards/MySQL after ops validation
+## Scheduled reports (Windows Task Scheduler)
+
+Weekly/biweekly jobs live in `jobs/` with registration scripts in `scripts/register_*_task.ps1`. Task names use the **GenesysToolkit-** prefix (e.g. `GenesysToolkit-WeeklyDirectOutbound`).
+
+Manual run example:
+
+```powershell
+python jobs\weekly_direct_outbound_report.py
+```
+
+## Folder structure
+
+```
+GenesysCloudToolkit/
+├── genesys_toolkit_app.py   # Canonical demo web entry
+├── ops_app.py               # Local execute web entry
+├── core/                    # Shared library
+├── app/                     # Flask routes, tool specs, queue performance
+├── tools/
+│   ├── telephony/
+│   ├── users_roles/
+│   ├── queues/
+│   ├── audits/
+│   └── reporting/
+├── jobs/                    # Scheduled report wrappers
+├── scripts/                 # Task registration, validation, probes
+│   └── probes/              # Ad-hoc API investigation scripts
+├── archive/oneoffs/         # Retired one-shot fix scripts (reference only)
+├── templates/               # Flask HTML
+├── templates_csv/           # CSV templates for ops tools
+├── config/                  # Reference CSVs (staffing, area codes)
+├── docs/                    # Design docs and migration notes
+├── outputs/                 # Tool output (gitignored)
+├── uploads/                 # Web form uploads (gitignored)
+└── client.env               # OAuth credentials (gitignored)
+```
+
+## Hosting
+
+- **Render (demo):** `render.demo.yaml` — service name `genesys-toolkit`, start `gunicorn genesys_toolkit_app:app …`
+- **Azure App Service (planned):** see `scripts/_generate_azure_hosting_doc.py` and `docs/repackaging_genesys_toolkit_20260910.md`
+
+Set `OPS_DEMO_MODE=1` on demo hosts (set automatically by `genesys_toolkit_app.py`).
+
+## Documentation
+
+| Doc | Topic |
+|-----|-------|
+| [README-DEMO.md](README-DEMO.md) | Demo deployment, env vars, Queue Performance auth |
+| [README-AGENT-DEMO.md](README-AGENT-DEMO.md) | Agent Workspace pilot |
+| [docs/repackaging_genesys_toolkit_20260910.md](docs/repackaging_genesys_toolkit_20260910.md) | Rebrand + cleanup notes (2026-09-10) |

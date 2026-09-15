@@ -1,3 +1,3 @@
-# Deprecated — site picker is mounted on ops-demo at /site-picker.
-# Deploy via render.demo.yaml (gunicorn ops_app_demo:app).
+# Deprecated — site picker is mounted on GenesysToolkit demo at /site-picker.
+# Deploy via render.demo.yaml (gunicorn genesys_toolkit_app:app).
 # Do not create a separate Render service for site picker.

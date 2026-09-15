@@ -9,8 +9,10 @@ $MaxRuns = 10
 if (-not (Test-Path $BatPath)) {
     throw "Missing launcher: $BatPath"
 }
-if (-not (Test-Path (Join-Path $ProjectDir "doug.env"))) {
-    Write-Warning "doug.env not found in $ProjectDir - email step will fail until it exists."
+$EmailEnv = Join-Path $ProjectDir "email.env"
+$DougEnv = Join-Path $ProjectDir "doug.env"
+if (-not (Test-Path $EmailEnv) -and -not (Test-Path $DougEnv)) {
+    Write-Warning "Neither email.env nor doug.env found in $ProjectDir - email step will fail until one exists."
 }
 
 $Action = New-ScheduledTaskAction -Execute $BatPath -WorkingDirectory $ProjectDir
