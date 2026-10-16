@@ -55,10 +55,13 @@ BLOCKED_NAMES = frozenset(
     {
         "eval", "exec", "compile", "__import__", "open", "input", "breakpoint", "getattr", "setattr",
         "delattr", "globals", "locals", "vars", "dir", "memoryview", "help", "exit", "quit",
-        "write_csv", "write_jsonl", "output_path", "os", "sys", "subprocess", "shutil", "pathlib",
+        "SystemExit", "write_csv", "write_jsonl", "output_path", "os", "sys", "subprocess", "shutil", "pathlib",
         "requests", "socket", "importlib", "builtins", "ctypes", "pickle", "Path",
     }
 )
+# Interpreter-termination names: still blocked (never rewritten); the hint tells users/LLM the fix.
+EXIT_NAMES = frozenset({"exit", "quit", "SystemExit"})
+EXIT_HINT = " (use main() with `return` for early exit and print errors instead of exit/quit/sys.exit)"
 # Attributes that would mutate, leak credentials, or bypass the request wrapper.
 BLOCKED_ATTRS = frozenset(
     {
@@ -145,7 +148,8 @@ def check_script(code: str) -> SafetyResult:
         # ---- names / attributes
         elif isinstance(node, ast.Name):
             if node.id in BLOCKED_NAMES:
-                bad(node, f"use of '{node.id}' is not allowed")
+                hint = EXIT_HINT if node.id in EXIT_NAMES else ""
+                bad(node, f"use of '{node.id}' is not allowed{hint}")
             elif node.id.startswith("__") and node.id not in ALLOWED_DUNDER_NAMES:
                 bad(node, f"use of '{node.id}' is not allowed")
         elif isinstance(node, ast.Attribute):

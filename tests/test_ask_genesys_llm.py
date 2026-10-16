@@ -145,6 +145,45 @@ class ScriptSafetyTests(unittest.TestCase):
         result = check_script(GOOD_SCRIPT)
         self.assertTrue(result.ok, result.violations)
 
+    def test_main_with_early_return_passes(self):
+        code = '''from core.cli import create_client, tool_log
+from core.genesys_client import GenesysError
+from core.lookups import find_user_by_email
+
+client = create_client(log=tool_log)
+
+
+def main():
+    try:
+        user = find_user_by_email(client, "jane.doe@example.com")
+    except GenesysError as exc:
+        print(f"Lookup failed: {exc}")
+        return
+    if not user:
+        print("No user found for that email.")
+        return
+    print(user.get("name"))
+
+
+if __name__ == "__main__":
+    main()
+'''
+        result = check_script(code)
+        self.assertTrue(result.ok, result.violations)
+
+    def test_blocks_exit_quit_sysexit_with_hint(self):
+        for stmt in ("exit(1)", "quit()", "raise SystemExit(1)"):
+            code = GOOD_SCRIPT + f"if not client:\n    {stmt}\n"
+            result = check_script(code)
+            self.assertFalse(result.ok, stmt)
+            self.assertTrue(any("return" in v and "main()" in v for v in result.violations), result.violations)
+        self.assertBlocked("import sys\n" + GOOD_SCRIPT + "sys.exit(1)\n")
+        self.assertBlocked("import os\n" + GOOD_SCRIPT + "os._exit(1)\n")
+
+    def test_advanced_prompt_forbids_exit_patterns(self):
+        for token in ("exit()", "quit()", "sys.exit()", "SystemExit", "main()", "return"):
+            self.assertIn(token, advanced.SYSTEM_PROMPT)
+
     def test_blocks_import_os(self):
         self.assertBlocked("import os\n" + GOOD_SCRIPT, "import 'os'")
 
