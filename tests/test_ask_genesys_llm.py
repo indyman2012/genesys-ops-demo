@@ -243,6 +243,25 @@ class AdvancedFlowTests(unittest.TestCase):
             self.assertFalse(advanced.advanced_access({SESSION_ROLES_KEY: ["Supervisor"]})[0])
             self.assertTrue(advanced.advanced_access({SESSION_ROLES_KEY: ["Admin"]})[0])
 
+    def test_role_gate_realistic_genesys_role_strings(self):
+        from app.ops_auth import SESSION_ROLES_KEY
+
+        env = {"OPENAI_API_KEY": "sk-test", "OPS_QUEUE_PERFORMANCE_PUBLIC": "0"}
+        with mock.patch.dict(os.environ, env, clear=False):
+            for name in ("ASK_GENESYS_ADVANCED_ROLES", "OPS_QUEUE_PERFORMANCE_ROLES", "ASK_GENESYS_ADVANCED_ENABLED"):
+                os.environ.pop(name, None)
+            ok = advanced.advanced_access
+            self.assertTrue(ok({SESSION_ROLES_KEY: ["Employee", "Master Admin"]})[0])
+            self.assertTrue(ok({SESSION_ROLES_KEY: ["  ADMIN "]})[0])
+            self.assertTrue(ok({SESSION_ROLES_KEY: ["Super_Admin"]})[0])
+            self.assertFalse(ok({SESSION_ROLES_KEY: ["Employee", "Archwell Agent"]})[0])
+            # custom role list (spacing/case/separators tolerated)
+            os.environ["ASK_GENESYS_ADVANCED_ROLES"] = " Archwell-Admin , admin "
+            self.assertTrue(ok({SESSION_ROLES_KEY: ["Archwell Admin"]})[0])
+            allowed, reason = ok({SESSION_ROLES_KEY: ["Employee"]})
+            self.assertFalse(allowed)
+            self.assertIn("Employee", reason)  # denial reason shows the user's actual roles
+
     def test_denied_without_openai_key(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("OPENAI_API_KEY", None)

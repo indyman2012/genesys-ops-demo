@@ -33,6 +33,20 @@ def _demo_mode() -> bool:
     return bool(current_app.config.get("DEMO_MODE")) or is_demo_mode()
 
 
+def _ensure_session_roles() -> None:
+    """Re-fetch Genesys roles when the session was created without them (e.g. older deploy)."""
+    from app.ops_auth import SESSION_ROLES_KEY, is_genesys_authenticated, sync_queue_performance_access
+
+    if not queue_performance_auth_enabled() or session.get(SESSION_ROLES_KEY):
+        return
+    if not is_genesys_authenticated(session):
+        return
+    try:
+        sync_queue_performance_access(session, create_client(log=tool_log))
+    except Exception as exc:  # leave roles empty; the denial reason will say so
+        tool_log("warn", f"ask-genesys role refresh failed: {exc}")
+
+
 @ask_bp.route("/ask-genesys")
 def ask_page():
     blocked = require_queue_performance_access()
@@ -42,6 +56,7 @@ def ask_page():
     from app.ask_genesys.llm_parser import llm_enabled
     from tools.reporting.ask_genesys_router import HELP_EXAMPLES
 
+    _ensure_session_roles()
     advanced_ok, advanced_reason = advanced_access(session)
     return render_template(
         "ops/ask_genesys.html",
@@ -94,6 +109,7 @@ def ask_api():
 def _advanced_response(prompt: str, user: str):
     from app.ask_genesys.advanced import MAX_ADVANCED_PROMPT_CHARS, advanced_access, answer_advanced
 
+    _ensure_session_roles()
     allowed, reason = advanced_access(session)
     if not allowed:
         tool_log("warn", f"ask-genesys ADVANCED denied user={user!r}: {reason}")

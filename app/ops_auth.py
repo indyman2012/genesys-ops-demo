@@ -1,14 +1,25 @@
 """Genesys OAuth gate for Queue Performance (supervisor/admin roles only)."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from core.config import env_first
 from core.genesys_client import safe_str
 
-DEFAULT_ALLOWED_ROLES = frozenset({"supervisor", "admin", "super admin"})
+# Genesys built-in admin roles are "Admin" and "Master Admin"; "Super Admin" kept for custom orgs.
+DEFAULT_ALLOWED_ROLES = frozenset({"supervisor", "admin", "master admin", "super admin"})
 SESSION_ACCESS_KEY = "queue_performance_allowed"
 SESSION_ROLES_KEY = "genesys_role_names"
+
+
+def normalize_role_name(name: Any) -> str:
+    """Case/whitespace/separator-insensitive role key ("Super_Admin", " super-admin " -> "super admin")."""
+    return " ".join(re.sub(r"[_\-]+", " ", str(name or "")).split()).lower()
+
+
+def normalize_role_names(names: Any) -> frozenset[str]:
+    return frozenset(n for n in (normalize_role_name(x) for x in (names or [])) if n)
 
 
 def queue_performance_public() -> bool:
@@ -24,7 +35,7 @@ def allowed_role_names() -> frozenset[str]:
     custom = (env_first("OPS_QUEUE_PERFORMANCE_ROLES") or "").strip()
     if not custom:
         return DEFAULT_ALLOWED_ROLES
-    return frozenset(part.strip().lower() for part in custom.split(",") if part.strip())
+    return normalize_role_names(custom.split(","))
 
 
 def is_genesys_authenticated(session: dict[str, Any]) -> bool:
@@ -46,7 +57,7 @@ def fetch_user_role_names(client, user_id: str) -> list[str]:
 
 def evaluate_queue_performance_access(client, user_id: str) -> tuple[bool, list[str], list[str]]:
     role_names = fetch_user_role_names(client, user_id)
-    normalized = {name.lower() for name in role_names}
+    normalized = normalize_role_names(role_names)
     matched = sorted(normalized & allowed_role_names())
     return bool(matched), role_names, matched
 

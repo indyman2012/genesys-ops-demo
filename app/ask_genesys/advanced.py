@@ -72,7 +72,9 @@ ChatFn = Callable[..., Any]
 def advanced_allowed_roles() -> frozenset[str]:
     custom = (os.environ.get("ASK_GENESYS_ADVANCED_ROLES") or "").strip()
     if custom:
-        return frozenset(part.strip().lower() for part in custom.split(",") if part.strip())
+        from app.ops_auth import normalize_role_names
+
+        return normalize_role_names(custom.split(","))
     from app.ops_auth import allowed_role_names
 
     return allowed_role_names()
@@ -96,10 +98,16 @@ def advanced_access(session: dict[str, Any]) -> tuple[bool, str]:
         if public_ok:
             return True, ""
         return False, "Advanced query requires Genesys sign-in (set ASK_GENESYS_ADVANCED_PUBLIC=1 for local dev only)."
-    roles = {str(r).strip().lower() for r in (session.get(SESSION_ROLES_KEY) or [])}
-    if roles & advanced_allowed_roles():
+    from app.ops_auth import normalize_role_names
+
+    session_roles = session.get(SESSION_ROLES_KEY) or []
+    if normalize_role_names(session_roles) & advanced_allowed_roles():
         return True, ""
-    return False, "Advanced query is limited to: " + ", ".join(sorted(advanced_allowed_roles())) + "."
+    have = ", ".join(str(r) for r in session_roles) or "none found in session"
+    return False, (
+        "Advanced query is limited to Genesys roles: " + ", ".join(sorted(advanced_allowed_roles()))
+        + f". Your roles: {have}. Set ASK_GENESYS_ADVANCED_ROLES to add yours."
+    )
 
 
 # --------------------------------------------------------------------------- generation

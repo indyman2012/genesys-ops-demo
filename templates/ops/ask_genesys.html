@@ -83,7 +83,7 @@
           </p>
         </div>
         {% elif auth_enabled %}
-        <p class="ask-advanced-locked" title="{{ advanced_reason }}">Advanced query is available to admins/supervisors only.</p>
+        <p class="ask-advanced-locked" title="{{ advanced_reason }}">Advanced query is unavailable: {{ advanced_reason }}</p>
         {% endif %}
       </form>
 
