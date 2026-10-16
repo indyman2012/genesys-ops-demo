@@ -1,0 +1,160 @@
+/* Ask Genesys — uses ArchWell tokens from static/archwell/shell.css */
+
+.ask-layout {
+  padding: 1rem 1.25rem 2rem;
+  flex: 1 1 auto;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.ask-card {
+  background: var(--aw-white);
+  border: 1px solid var(--aw-border);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--aw-shadow);
+  margin-bottom: 1rem;
+}
+
+.ask-form label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--aw-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ask-input-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.ask-input-row input {
+  flex: 1 1 auto;
+  font: inherit;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--aw-border);
+  border-radius: 8px;
+  color: var(--aw-navy);
+}
+
+.ask-input-row input:focus {
+  outline: 2px solid var(--aw-blue-light);
+  border-color: var(--aw-blue);
+}
+
+.ask-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.ask-examples-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--aw-muted);
+}
+
+.ask-chip {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--aw-border);
+  border-radius: 999px;
+  background: #f8fafb;
+  color: var(--aw-navy);
+  cursor: pointer;
+}
+
+.ask-chip:hover {
+  background: var(--aw-orange-light);
+}
+
+.ask-result-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-heading);
+  color: var(--aw-navy);
+  font-size: 1.1rem;
+}
+
+.ask-answer {
+  margin: 0 0 1rem;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: var(--aw-navy);
+}
+
+.ask-help-list {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+  line-height: 1.7;
+  color: var(--aw-navy);
+}
+
+.ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.ask-json {
+  margin: 0.85rem 0 0;
+  padding: 0.85rem 1rem;
+  background: #f8fafb;
+  border: 1px solid var(--aw-border);
+  border-radius: 8px;
+  max-height: 420px;
+  overflow: auto;
+  font-size: 0.8rem;
+}
+
+.ask-layout .monitor-table {
+  min-width: 640px;
+}
+
+.error-banner {
+  background: var(--aw-orange-light);
+  border: 1px solid #f0cdb8;
+  color: var(--aw-danger);
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.monitor-table-wrap {
+  border: 1px solid var(--aw-border);
+  border-radius: 12px;
+  overflow: auto;
+}
+
+.monitor-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.monitor-table th,
+.monitor-table td {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--aw-border);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.monitor-table th {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--aw-muted);
+  background: #f8fafb;
+  font-weight: 700;
+}
+
+.monitor-table tbody tr:hover {
+  background: var(--aw-orange-light);
+}

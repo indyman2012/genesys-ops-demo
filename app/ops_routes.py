@@ -327,4 +327,7 @@ def create_app(*, demo_mode: bool = False):
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = on_render or os.environ.get("FLASK_SECURE_COOKIES") == "1"
     app.register_blueprint(ops_bp)
+    from app.ask_genesys import ask_bp
+
+    app.register_blueprint(ask_bp)
     return app

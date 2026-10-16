@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en" data-demo-mode="{{ '1' if demo_mode else '0' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask Genesys — GenesysToolkit</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='agent_workspace/archwell-favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/ask_genesys.css') }}?v=1">
+</head>
+<body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
+  <div class="app-shell">
+  {% if demo_mode %}
+  <div class="demo-banner">
+    <strong>Demo mode</strong> — read-only questions against live Genesys data. No changes can be made from this page.
+  </div>
+  {% endif %}
+
+  <div class="topbar-strip">
+    <span>Contact Center · Admin tools</span>
+  </div>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <p class="page-subtitle">Ask a question in plain English. <strong>Read-only</strong> — nothing is changed in Genesys Cloud.</p>
+    </div>
+    <div class="brand">
+      <img
+        class="brand-logo"
+        src="{{ url_for('static', filename='agent_workspace/archwell-logo.svg') }}"
+        alt="ArchWell Health"
+        width="160"
+        height="47"
+      >
+      <div class="brand-sub">Ask Genesys{% if demo_mode %} <span class="demo-tag">Demo</span>{% endif %}</div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-actions">
+        <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Ops Console</a>
+        <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>
+        <a href="{{ url_for('ops.queue_performance_page') }}" class="btn btn-secondary">Queue Performance</a>
+        {% if auth_enabled and auth_user_name %}
+        <a href="{{ url_for('ops.queue_performance_logout') }}" class="btn btn-secondary">Sign out ({{ auth_user_name }})</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="ask-layout">
+    <section class="ask-card">
+      <form id="ask-form" class="ask-form" autocomplete="off">
+        <label for="ask-prompt">Your question</label>
+        <div class="ask-input-row">
+          <input
+            id="ask-prompt"
+            name="prompt"
+            type="text"
+            maxlength="500"
+            placeholder="When was the last time 9547909709 called us?"
+            required
+            autofocus
+          >
+          <button type="submit" id="ask-submit" class="btn btn-primary">Ask</button>
+        </div>
+      </form>
+
+      <div class="ask-examples">
+        <span class="ask-examples-label">Try:</span>
+        {% for example in examples %}
+        <button type="button" class="ask-chip" data-example="{{ example }}">{{ example }}</button>
+        {% endfor %}
+      </div>
+    </section>
+
+    <p id="ask-error" class="error-banner hidden"></p>
+
+    <section id="ask-result" class="ask-card ask-result hidden" aria-live="polite">
+      <h2 class="ask-result-title">Answer</h2>
+      <p id="ask-answer" class="ask-answer"></p>
+      <ul id="ask-examples-list" class="ask-help-list hidden"></ul>
+
+      <div id="ask-table-wrap" class="monitor-table-wrap hidden">
+        <table class="monitor-table">
+          <thead id="ask-thead"></thead>
+          <tbody id="ask-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="ask-actions">
+        <a id="ask-csv" class="btn btn-secondary hidden" href="#">Download CSV</a>
+        <button type="button" id="ask-json-toggle" class="btn btn-secondary">View raw JSON</button>
+      </div>
+      <pre id="ask-json" class="ask-json hidden"></pre>
+    </section>
+  </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='ops/ask_genesys.js') }}?v=1"></script>
+</body>
+</html>
