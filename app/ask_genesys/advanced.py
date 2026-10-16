@@ -15,6 +15,7 @@ Env:
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -26,7 +27,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.ask_genesys.llm_parser import get_openai_client, openai_model
-from app.ask_genesys.script_safety import check_script
+from app.ask_genesys.script_safety import ALLOWED_FROM_IMPORTS, check_script
 from core.paths import OUTPUTS_DIR, PROJECT_ROOT, ensure_runtime_dirs
 
 GENERATED_DIR_NAME = "ask_genesys_generated"
@@ -50,6 +51,15 @@ HARD RULES (a static checker rejects anything else):
   core.cli (create_client, tool_log), core.genesys_client (GenesysClient, safe_str),
   core.lookups (get_all_queues, find_user_by_email, get_queues_by_prefix, find_queue_by_name,
   get_queue_members, find_user_queue_memberships, user_is_queue_member).
+- EVERY helper you call must be imported explicitly, e.g. for a queue by name:
+    from core.cli import create_client, tool_log
+    from core.genesys_client import GenesysError
+    from core.lookups import find_queue_by_name, get_queue_members
+    client = create_client(log=tool_log)
+    queue = find_queue_by_name(client, "Queue Name")   # exact, case-insensitive; raises GenesysError if missing
+    members = get_queue_members(client, queue["id"])
+  Helpers take `client` as FIRST argument. Other queue lookups: client.paged_get("/api/v2/routing/queues",
+  params={"name": "*partial*"}) or get_queues_by_prefix(client, "PREFIX").
 - Use client.request("GET", "/api/v2/...", params={...}) and client.paged_get("/api/v2/...", params={...}).
 - POST is allowed ONLY for analytics query / search endpoints with a LITERAL path, e.g.
   client.request("POST", "/api/v2/analytics/conversations/details/query", json_body={...}) or
@@ -129,6 +139,58 @@ def advanced_access(session: dict[str, Any]) -> tuple[bool, str]:
 # --------------------------------------------------------------------------- generation
 
 
+def _bound_names(tree: ast.AST) -> set[str]:
+    bound: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                bound.add((alias.asname or alias.name).split(".")[0])
+        elif isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            bound.add(node.name)
+        elif isinstance(node, ast.arg):
+            bound.add(node.arg)
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            bound.add(node.id)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            bound.add(node.name)
+    return bound
+
+
+def ensure_helper_imports(script: str) -> str:
+    """Prepend imports for allowlisted helpers (core.lookups, GenesysError, ...) used but never imported.
+
+    The LLM often calls e.g. find_queue_by_name(...) after importing only create_client/tool_log,
+    which passes the static check but dies with NameError at run time. Only names from the
+    safety allowlist are injected, so the result still goes through check_script unchanged.
+    """
+    try:
+        tree = ast.parse(script)
+    except SyntaxError:
+        return script  # let check_script report it
+    bound = _bound_names(tree)
+    used = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+    lines: list[str] = []
+    for module, names in ALLOWED_FROM_IMPORTS.items():
+        missing = sorted(n for n in names if n in used and n not in bound)
+        if missing:
+            lines.append(f"from {module} import {', '.join(missing)}")
+    if not lines:
+        return script
+    # Keep `from __future__ import ...` (and a module docstring) first.
+    body = tree.body
+    insert_after = 0
+    for i, stmt in enumerate(body):
+        is_doc = i == 0 and isinstance(stmt, ast.Expr) and isinstance(getattr(stmt, "value", None), ast.Constant) and isinstance(stmt.value.value, str)
+        is_future = isinstance(stmt, ast.ImportFrom) and stmt.module == "__future__"
+        if is_doc or is_future:
+            insert_after = stmt.end_lineno or 0
+        else:
+            break
+    src_lines = script.splitlines()
+    new = src_lines[:insert_after] + ["# auto-added imports (allowlisted helpers)"] + lines + src_lines[insert_after:]
+    return "\n".join(new).rstrip() + "\n"
+
+
 def _strip_fences(text: str) -> str:
     match = re.search(r"```(?:python)?\s*\n(.*?)```", text, re.S)
     return (match.group(1) if match else text).strip() + "\n"
@@ -158,6 +220,7 @@ def generate_script(prompt: str, *, chat_fn: ChatFn | None = None) -> tuple[str,
     except (TypeError, ValueError):
         script, summary = _strip_fences(content or ""), ""
     script = _strip_fences(script) if "```" in script else script.rstrip() + "\n"
+    script = ensure_helper_imports(script)
     return script, summary, model
 
 

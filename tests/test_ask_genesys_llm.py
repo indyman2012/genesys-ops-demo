@@ -307,5 +307,89 @@ class AdvancedFlowTests(unittest.TestCase):
             self.assertFalse(advanced.advanced_access({})[0])
 
 
+QUEUE_SCRIPT_NO_IMPORT = '''from core.cli import create_client, tool_log
+
+client = create_client(log=tool_log)
+
+
+def main():
+    queue = find_queue_by_name(client, "Support Queue")
+    print(queue["id"], len(get_queue_members(client, queue["id"])))
+
+
+main()
+'''
+
+
+class QueueLookupImportTests(unittest.TestCase):
+    """Regression: LLM called find_queue_by_name without importing it -> NameError at run time."""
+
+    class FakeClient:
+        def paged_get(self, path, params=None):
+            if path == "/api/v2/routing/queues":
+                return [{"id": "q1", "name": "support queue"}, {"id": "q2", "name": "Other"}]
+            if path == "/api/v2/routing/queues/q1/members":
+                return [{"id": "u1"}, {"id": "u2"}]
+            raise AssertionError(path)
+
+    def _run(self, script: str) -> str:
+        import contextlib
+        import io
+
+        buf = io.StringIO()
+        with mock.patch("core.cli.create_client", return_value=self.FakeClient()):
+            with contextlib.redirect_stdout(buf):
+                exec(compile(script, "<ask>", "exec"), {"__name__": "__main__"})  # noqa: S102 (test only)
+        return buf.getvalue()
+
+    def test_missing_import_is_added_and_script_runs(self):
+        # Unpatched, the checker passes it but it would die with NameError.
+        self.assertTrue(check_script(QUEUE_SCRIPT_NO_IMPORT).ok)
+        with self.assertRaises(NameError):
+            self._run(QUEUE_SCRIPT_NO_IMPORT)
+
+        fixed = advanced.ensure_helper_imports(QUEUE_SCRIPT_NO_IMPORT)
+        self.assertIn("from core.lookups import find_queue_by_name, get_queue_members", fixed)
+        result = check_script(fixed)
+        self.assertTrue(result.ok, result.violations)
+        self.assertEqual(self._run(fixed).strip(), "q1 2")
+
+    def test_existing_imports_untouched(self):
+        script = (
+            "from core.cli import create_client, tool_log\n"
+            "from core.lookups import find_queue_by_name\n"
+            "client = create_client(log=tool_log)\n"
+            'print(find_queue_by_name(client, "Support Queue")["id"])\n'
+        )
+        self.assertEqual(advanced.ensure_helper_imports(script), script)
+        self.assertEqual(self._run(script).strip(), "q1")
+
+    def test_locally_defined_helper_not_shadowed(self):
+        script = GOOD_SCRIPT + "def find_queue_by_name(c, n):\n    return None\nfind_queue_by_name(client, 'x')\n"
+        self.assertNotIn("core.lookups", advanced.ensure_helper_imports(script))
+
+    def test_future_import_stays_first(self):
+        script = "from __future__ import annotations\n" + QUEUE_SCRIPT_NO_IMPORT
+        fixed = advanced.ensure_helper_imports(script)
+        self.assertTrue(fixed.startswith("from __future__ import annotations\n"))
+        compile(fixed, "<ask>", "exec")
+        self.assertTrue(check_script(fixed).ok)
+
+    def test_non_allowlisted_name_not_injected(self):
+        script = GOOD_SCRIPT + "delete_queue(client, 'x')\n"
+        self.assertEqual(advanced.ensure_helper_imports(script), script)
+
+    def test_generate_script_injects_import(self):
+        content = json.dumps({"summary": "s", "script": QUEUE_SCRIPT_NO_IMPORT})
+        script, _, _ = advanced.generate_script(
+            "members of Support Queue", chat_fn=lambda **_kw: {"choices": [{"message": {"content": content}}]}
+        )
+        self.assertIn("from core.lookups import find_queue_by_name", script)
+
+    def test_prompt_documents_queue_lookup(self):
+        self.assertIn("from core.lookups import find_queue_by_name", advanced.SYSTEM_PROMPT)
+        self.assertIn("routing/queues", advanced.SYSTEM_PROMPT)
+
+
 if __name__ == "__main__":
     unittest.main()
