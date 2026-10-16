@@ -47,6 +47,16 @@ ALLOWED_FROM_IMPORTS: dict[str, frozenset[str]] = {
             "user_is_queue_member",
         }
     ),
+    "core.ask_analytics": frozenset(
+        {
+            "api_interval",
+            "date_range_last_days",
+            "query_queue_inbound_offered_buckets",
+            "peak_30min_time_of_day_inbound",
+            "GRANULARITY_30M",
+            "DEFAULT_TZ_OFFSET_HOURS",
+        }
+    ),
 }
 # `import core.cli` style is not allowed; `from core.cli import create_client` is.
 ALLOWED_FROM_PLAIN = ALLOWED_PLAIN_MODULES  # `from datetime import datetime` etc.

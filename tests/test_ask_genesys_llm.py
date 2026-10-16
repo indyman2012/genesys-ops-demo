@@ -414,6 +414,38 @@ class QueueLookupImportTests(unittest.TestCase):
         fixed = advanced.ensure_helper_imports(script)
         self.assertIn("from datetime import timedelta", fixed)
 
+    def test_peak_analytics_helper_import_injected(self):
+        script = (
+            "from core.cli import create_client, tool_log\n"
+            "from core.lookups import find_queue_by_name\n"
+            "client = create_client(log=tool_log)\n"
+            "def main():\n"
+            '    q = find_queue_by_name(client, "Support Queue")\n'
+            "    print(peak_30min_time_of_day_inbound(client, q['id'], days=30))\n"
+            "main()\n"
+        )
+        fixed = advanced.ensure_helper_imports(script)
+        self.assertIn("from core.ask_analytics import peak_30min_time_of_day_inbound", fixed)
+        self.assertTrue(check_script(fixed).ok)
+
+    def test_prompt_forbids_30m_in_interval(self):
+        self.assertIn("NEVER put", advanced.SYSTEM_PROMPT)
+        self.assertIn("PT30M", advanced.SYSTEM_PROMPT)
+        self.assertIn("peak_30min_time_of_day_inbound", advanced.SYSTEM_PROMPT)
+
+
+class AskAnalyticsHelperTests(unittest.TestCase):
+    def test_api_interval_is_date_range(self):
+        from datetime import date
+
+        from core.ask_analytics import api_interval
+
+        s = api_interval(date(2026, 1, 1), date(2026, 1, 7))
+        self.assertIn("/", s)
+        self.assertIn("2026-01-01", s)
+        self.assertNotIn("PT30M", s)
+        self.assertNotIn("30m", s)
+
 
 if __name__ == "__main__":
     unittest.main()

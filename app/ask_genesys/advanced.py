@@ -51,7 +51,9 @@ HARD RULES (a static checker rejects anything else):
 - Allowed imports ONLY: json, datetime, re, math, collections, itertools, statistics, typing,
   core.cli (create_client, tool_log), core.genesys_client (GenesysClient, safe_str),
   core.lookups (get_all_queues, find_user_by_email, get_queues_by_prefix, find_queue_by_name,
-  get_queue_members, find_user_queue_memberships, user_is_queue_member).
+  get_queue_members, find_user_queue_memberships, user_is_queue_member),
+  core.ask_analytics (api_interval, date_range_last_days, peak_30min_time_of_day_inbound,
+  query_queue_inbound_offered_buckets, GRANULARITY_30M).
 - EVERY helper you call must be imported explicitly, e.g. for a queue by name:
     from core.cli import create_client, tool_log
     from core.genesys_client import GenesysError
@@ -64,7 +66,17 @@ HARD RULES (a static checker rejects anything else):
 - Use client.request("GET", "/api/v2/...", params={...}) and client.paged_get("/api/v2/...", params={...}).
 - POST is allowed ONLY for analytics query / search endpoints with a LITERAL path, e.g.
   client.request("POST", "/api/v2/analytics/conversations/details/query", json_body={...}) or
+  client.request("POST", "/api/v2/analytics/conversations/aggregates/query", json_body={...}) or
   client.request("POST", "/api/v2/users/search", json_body={...}).
+- Genesys analytics JSON (do not swap these fields):
+    * "interval" = UTC date RANGE string only: "2026-01-01T04:00:00.000Z/2026-01-08T04:00:00.000Z"
+      NEVER put "30m", "PT30M", or a duration in "interval".
+    * "granularity" = bucket size ISO duration: "PT30M" (30 minutes), "P1D" (daily).
+  For peak 30-minute time-of-day inbound volume by queue name, prefer:
+    from core.lookups import find_queue_by_name
+    from core.ask_analytics import peak_30min_time_of_day_inbound
+    queue = find_queue_by_name(client, "Exact Queue Name")
+    print(json.dumps(peak_30min_time_of_day_inbound(client, queue["id"], days=90), indent=2))
 - Method and POST path must be string literals. Never PUT/PATCH/DELETE. No other POST.
 - FORBIDDEN: os, sys, subprocess, requests, open(), file writes, eval/exec, getattr, dunder names,
   client.token, environment access, network access other than client.request.
