@@ -390,6 +390,30 @@ class QueueLookupImportTests(unittest.TestCase):
         self.assertIn("from core.lookups import find_queue_by_name", advanced.SYSTEM_PROMPT)
         self.assertIn("routing/queues", advanced.SYSTEM_PROMPT)
 
+    def test_datetime_module_attr_normalized_and_imported(self):
+        script = (
+            "from core.cli import create_client, tool_log\n"
+            "client = create_client(log=tool_log)\n"
+            "def main():\n"
+            "    end = datetime.utcnow()\n"
+            "    start = end - datetime.timedelta(days=31)\n"
+            "    print(start, end)\n"
+            "main()\n"
+        )
+        fixed = advanced.ensure_helper_imports(script)
+        self.assertIn("from datetime import datetime, timedelta", fixed)
+        self.assertNotIn("datetime.timedelta", fixed)
+        self.assertTrue(check_script(fixed).ok)
+
+    def test_bare_timedelta_imported(self):
+        script = (
+            "from core.cli import create_client, tool_log\n"
+            "client = create_client(log=tool_log)\n"
+            "print(timedelta(days=7))\n"
+        )
+        fixed = advanced.ensure_helper_imports(script)
+        self.assertIn("from datetime import timedelta", fixed)
+
 
 if __name__ == "__main__":
     unittest.main()
