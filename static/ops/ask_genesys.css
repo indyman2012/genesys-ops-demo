@@ -158,3 +158,107 @@
 .monitor-table tbody tr:hover {
   background: var(--aw-orange-light);
 }
+
+/* --- Thinking / running status ------------------------------------------ */
+.ask-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+  font-size: 0.9rem;
+  color: var(--aw-muted);
+}
+
+.ask-spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid var(--aw-border);
+  border-top-color: var(--aw-blue);
+  border-radius: 50%;
+  animation: ask-spin 0.8s linear infinite;
+}
+
+@keyframes ask-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ask-muted {
+  color: var(--aw-muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+/* --- Advanced (warning-styled) ------------------------------------------ */
+.ask-advanced {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  background: #fff8e6;
+  border: 1px solid #f0cf7a;
+  border-left: 4px solid #e0a100;
+  border-radius: 8px;
+}
+
+.ask-advanced-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 0.92rem !important;
+  color: #7a5600 !important;
+  cursor: pointer;
+}
+
+.ask-advanced-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #7a5600;
+}
+
+.ask-advanced-locked {
+  margin: 0.8rem 0 0;
+  font-size: 0.8rem;
+  color: var(--aw-muted);
+}
+
+.ask-form-advanced .ask-input-row input {
+  border-color: #e0a100;
+}
+
+.ask-adv-result {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px dashed #e0a100;
+}
+
+.ask-adv-badge {
+  margin: 0 0 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.ask-adv-ok { background: #e8f6ec; color: #1f6b3a; border: 1px solid #b6e0c3; }
+.ask-adv-fail { background: var(--aw-orange-light); color: var(--aw-danger); border: 1px solid #f0cdb8; }
+
+.ask-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--aw-navy);
+}
+
+.ask-adv-heading {
+  margin: 0.9rem 0 0.2rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--aw-muted);
+}
+
+.ask-adv-result .ask-json {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

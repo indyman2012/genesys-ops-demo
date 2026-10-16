@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Ask Genesys — read-only natural-language router (regex/keyword v1, no LLM).
+"""Ask Genesys — read-only natural-language router (OpenAI tool-call router + regex fallback).
+
+Routing: if OPENAI_API_KEY is set (and ASK_GENESYS_USE_LLM != 0) the LLM picks one allowlisted
+intent; on any failure/invalid output the regex parser below is used instead.
 
 Shared by the web UI (app/ask_genesys/routes.py) and the CLI:
 
@@ -445,9 +448,93 @@ def help_result(parsed: ParsedIntent) -> dict[str, Any]:
     }
 
 
-def answer_prompt(client_or_factory, prompt: str) -> dict[str, Any]:
-    """Parse + answer. `client_or_factory` may be a GenesysClient or a zero-arg callable returning one."""
+ALLOWED_INTENTS = frozenset({"last_inbound_call", "user_queues_joined", "help"})
+
+
+_QUIET = False  # CLI --json sets this so stdout stays valid JSON
+
+
+def _say(message: str) -> None:
+    if not _QUIET:
+        print(message, flush=True)
+
+
+def _log_route(source: str, parsed: ParsedIntent, extra: str = "") -> None:
+    """Log intent + params only (never API responses) to stdout."""
+    params = {
+        "phone": f"***{parsed.phone[-4:]}" if parsed.phone else "",
+        "user_query": parsed.user_query,
+        "lookback_days": parsed.lookback_days,
+        "include_unjoined": parsed.include_unjoined,
+    }
+    _say(f"[ASK] route={source} intent={parsed.intent} params={json.dumps(params)}{extra}")
+
+
+def parse_with_llm(prompt: str, *, chat_fn=None) -> tuple[ParsedIntent, dict[str, Any]] | None:
+    """OpenAI tool-call router -> (ParsedIntent, parsed_intent metadata), or None to use regex.
+
+    Any failure (no key, API error, unknown tool, bad params) returns None; nothing here raises.
+    """
+    from app.ask_genesys import llm_parser
+
+    if chat_fn is None and not llm_parser.llm_enabled():
+        return None
+    text = (prompt or "").strip()
+    if not text:
+        return None
+    try:
+        route = llm_parser.route_with_llm(text, chat_fn=chat_fn)
+    except Exception as exc:  # network, auth, SDK missing, rate limit...
+        _say(f"[ASK] llm_error={type(exc).__name__}: {str(exc)[:200]} -> regex fallback")
+        return None
+    if route is None or route.intent not in ALLOWED_INTENTS:
+        _say("[ASK] llm returned no valid tool -> regex fallback")
+        return None
+    params = llm_parser.sanitize_arguments(route, text)
+    if params is None:
+        _say(f"[ASK] llm tool={route.tool} had invalid params -> regex fallback")
+        return None
+
+    if route.tool == "last_inbound_call":
+        parsed = ParsedIntent(
+            intent="last_inbound_call", prompt=text, phone=params["phone"], lookback_days=params["lookback_days"]
+        )
+    elif route.tool == "user_queue_membership":
+        parsed = ParsedIntent(
+            intent="user_queues_joined",
+            prompt=text,
+            user_query=params["user"],
+            include_unjoined=params["include_unjoined"],
+        )
+    elif route.tool == "need_clarification":
+        parsed = ParsedIntent(intent="help", prompt=text, notes=[params["question"]])
+    else:
+        parsed = ParsedIntent(intent="help", prompt=text)
+
+    meta = {
+        "source": "llm",
+        "model": route.model,
+        "tool": route.tool,
+        "intent": parsed.intent,
+        "params": {k: (f"***{v[-4:]}" if k == "phone" else v) for k, v in params.items()},
+    }
+    return parsed, meta
+
+
+def resolve_intent(prompt: str, *, chat_fn=None) -> tuple[ParsedIntent, dict[str, Any]]:
+    """LLM first (allowlist-validated), regex parser as fallback."""
+    llm = parse_with_llm(prompt, chat_fn=chat_fn)
+    if llm is not None:
+        _log_route("llm", llm[0])
+        return llm
     parsed = parse_prompt(prompt)
+    _log_route("regex", parsed)
+    return parsed, {"source": "regex", "intent": parsed.intent}
+
+
+def answer_prompt(client_or_factory, prompt: str, *, chat_fn=None) -> dict[str, Any]:
+    """Parse + answer. `client_or_factory` may be a GenesysClient or a zero-arg callable returning one."""
+    parsed, parsed_meta = resolve_intent(prompt, chat_fn=chat_fn)
     if parsed.intent == "help":
         result = help_result(parsed)
     else:
@@ -457,6 +544,7 @@ def answer_prompt(client_or_factory, prompt: str) -> dict[str, Any]:
         else:
             result = answer_user_queues(client, parsed)
     result["parsed"] = asdict(parsed)
+    result["parsed_intent"] = parsed_meta
     result["read_only"] = True
     return result
 
@@ -479,6 +567,8 @@ def main() -> int:
 
     from core.cli import create_client, tool_log
 
+    global _QUIET
+    _QUIET = bool(args.json)
     result = answer_prompt(lambda: create_client(log=tool_log, env_file=args.env_file), prompt)
     if args.json:
         print(json.dumps(result, indent=2, default=str))

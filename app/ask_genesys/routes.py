@@ -1,8 +1,12 @@
-"""Ask Genesys — read-only natural-language query page (regex router, no LLM).
+﻿"""Ask Genesys - read-only natural-language query page.
+
+Standard mode: OpenAI tool-call router -> existing read-only handlers (regex fallback).
+Advanced mode: LLM-generated read-only query script, AST-checked and run in a subprocess.
 
 Access uses the same Genesys OAuth + role gate as Queue Performance
 (supervisor / admin / super admin by default; override with OPS_QUEUE_PERFORMANCE_ROLES,
 or OPS_QUEUE_PERFORMANCE_PUBLIC=1 for local dev). Production should keep the gate on.
+Advanced mode has its own gate (ASK_GENESYS_ADVANCED_ROLES); see advanced.py.
 """
 from __future__ import annotations
 
@@ -34,14 +38,20 @@ def ask_page():
     blocked = require_queue_performance_access()
     if blocked:
         return blocked
+    from app.ask_genesys.advanced import advanced_access
+    from app.ask_genesys.llm_parser import llm_enabled
     from tools.reporting.ask_genesys_router import HELP_EXAMPLES
 
+    advanced_ok, advanced_reason = advanced_access(session)
     return render_template(
         "ops/ask_genesys.html",
         demo_mode=_demo_mode(),
         auth_enabled=queue_performance_auth_enabled(),
         auth_user_name=session.get("genesys_user_name") or "",
         examples=HELP_EXAMPLES,
+        llm_on=llm_enabled(),
+        advanced_allowed=advanced_ok,
+        advanced_reason=advanced_reason,
     )
 
 
@@ -53,11 +63,17 @@ def ask_api():
 
     payload = request.get_json(silent=True) or {}
     prompt = str(payload.get("prompt") or request.form.get("prompt") or "").strip()
+    advanced = payload.get("advanced") in (True, 1, "1", "true", "True")
+    user = session.get("genesys_user_name") or "anonymous"
+
+    if advanced:
+        return _advanced_response(prompt, user)
+
     if len(prompt) > MAX_PROMPT_CHARS:
         return jsonify({"error": f"Prompt too long (max {MAX_PROMPT_CHARS} characters)."}), 400
 
     # Lightweight audit trail (stdout). v2: persist to a durable audit log.
-    tool_log("info", f"ask-genesys user={session.get('genesys_user_name') or 'anonymous'!r} prompt={prompt!r}")
+    tool_log("info", f"ask-genesys user={user!r} prompt={prompt!r}")
 
     try:
         from tools.reporting.ask_genesys_router import answer_prompt
@@ -73,6 +89,25 @@ def ask_api():
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+def _advanced_response(prompt: str, user: str):
+    from app.ask_genesys.advanced import MAX_ADVANCED_PROMPT_CHARS, advanced_access, answer_advanced
+
+    allowed, reason = advanced_access(session)
+    if not allowed:
+        tool_log("warn", f"ask-genesys ADVANCED denied user={user!r}: {reason}")
+        return jsonify({"error": reason, "advanced": True, "ok": False}), 403
+    if not prompt:
+        return jsonify({"error": "Prompt is required."}), 400
+    if len(prompt) > MAX_ADVANCED_PROMPT_CHARS:
+        return jsonify({"error": f"Prompt too long (max {MAX_ADVANCED_PROMPT_CHARS} characters)."}), 400
+
+    tool_log("info", f"ask-genesys ADVANCED user={user!r} prompt={prompt!r}")
+    try:
+        return jsonify(answer_advanced(prompt, user=user))
+    except Exception as exc:
+        return jsonify({"error": f"Advanced query failed: {exc}", "advanced": True, "ok": False}), 500
 
 
 @ask_bp.route("/api/ask-genesys/csv/<filename>")

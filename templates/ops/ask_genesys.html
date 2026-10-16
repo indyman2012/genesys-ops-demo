@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='ops/ask_genesys.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/ask_genesys.css') }}?v=2">
 </head>
 <body class="ops-page{% if demo_mode %} demo-mode{% endif %}">
   <div class="app-shell">
@@ -66,6 +66,25 @@
           >
           <button type="submit" id="ask-submit" class="btn btn-primary">Ask</button>
         </div>
+        <div id="ask-status" class="ask-status hidden" role="status" aria-live="polite">
+          <span class="ask-spinner" aria-hidden="true"></span><span id="ask-status-text">Thinking…</span>
+        </div>
+
+        {% if advanced_allowed %}
+        <div class="ask-advanced" id="ask-advanced-box">
+          <label class="ask-advanced-toggle" for="ask-advanced">
+            <input type="checkbox" id="ask-advanced" name="advanced">
+            <span><strong>Advanced query</strong> (generate read-only script)</span>
+          </label>
+          <p class="ask-advanced-note">
+            <strong>Admin only · read-only.</strong> The AI writes a Python script that only reads Genesys data
+            (GET / analytics query). It is safety-checked, then run for up to 120s. Generated scripts are
+            logged for audit. Longer prompts allowed (up to 1500 characters).
+          </p>
+        </div>
+        {% elif auth_enabled %}
+        <p class="ask-advanced-locked" title="{{ advanced_reason }}">Advanced query is available to admins/supervisors only.</p>
+        {% endif %}
       </form>
 
       <div class="ask-examples">
@@ -81,6 +100,7 @@
     <section id="ask-result" class="ask-card ask-result hidden" aria-live="polite">
       <h2 class="ask-result-title">Answer</h2>
       <p id="ask-answer" class="ask-answer"></p>
+      <p id="ask-route" class="ask-muted hidden"></p>
       <ul id="ask-examples-list" class="ask-help-list hidden"></ul>
 
       <div id="ask-table-wrap" class="monitor-table-wrap hidden">
@@ -95,10 +115,22 @@
         <button type="button" id="ask-json-toggle" class="btn btn-secondary">View raw JSON</button>
       </div>
       <pre id="ask-json" class="ask-json hidden"></pre>
+
+      <div id="ask-adv-result" class="ask-adv-result hidden">
+        <p id="ask-adv-badge" class="ask-adv-badge"></p>
+        <details class="ask-details" id="ask-script-details">
+          <summary>Generated script <span id="ask-script-file" class="ask-muted"></span></summary>
+          <pre id="ask-script" class="ask-json"></pre>
+        </details>
+        <h3 class="ask-adv-heading">Execution output</h3>
+        <pre id="ask-exec-out" class="ask-json"></pre>
+        <h3 class="ask-adv-heading hidden" id="ask-exec-err-heading">stderr</h3>
+        <pre id="ask-exec-err" class="ask-json hidden"></pre>
+      </div>
     </section>
   </main>
   </div>
 
-  <script src="{{ url_for('static', filename='ops/ask_genesys.js') }}?v=1"></script>
+  <script src="{{ url_for('static', filename='ops/ask_genesys.js') }}?v=2"></script>
 </body>
 </html>
