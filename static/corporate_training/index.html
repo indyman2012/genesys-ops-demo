@@ -49,6 +49,26 @@
           <div id="result-return" class="result"></div>
         </section>
 
+        <section class="workflow">
+          <h2>3 — Assign to a training queue</h2>
+          <p class="help">
+            Adds each person to the training queue you select and sets <code>joined=true</code>
+            so they receive calls from that queue.
+          </p>
+          <div class="field">
+            <label for="assign-queue">Training queue</label>
+            <select id="assign-queue" disabled>
+              <option value="">— Sign in to load queues —</option>
+            </select>
+          </div>
+          <div class="row">
+            <input type="file" id="file-assign" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <button type="button" class="secondary" id="btn-assign-preview">Preview</button>
+            <button type="button" class="primary" id="btn-assign-apply" disabled>Apply changes</button>
+          </div>
+          <div id="result-assign" class="result"></div>
+        </section>
+
         <details>
           <summary>Hosting &amp; sign-in</summary>
           <div class="inner">

@@ -7,9 +7,11 @@ from flask import Blueprint, jsonify, request, send_from_directory
 from app.ops_auth import require_queue_performance_access
 from core.cli import create_client, tool_log
 from core.paths import PROJECT_ROOT
+from core.genesys_client import GenesysError
 from tools.queues.corporate_training_roster_lib import (
     list_corporate_training_queues,
     parse_names_from_workbook,
+    run_assign_to_training_queue,
     run_return_from_training,
     run_start_training,
 )
@@ -52,7 +54,9 @@ def setup_api():
         training = list_corporate_training_queues(client)
         return jsonify(
             {
-                "training_queues": [q.get("name") for q in training],
+                "training_queues": [
+                    {"id": q.get("id"), "name": q.get("name")} for q in training
+                ],
                 "training_queue_count": len(training),
             }
         )
@@ -92,6 +96,29 @@ def return_from_training_api():
         return jsonify({"error": str(exc)}), 500
 
 
+def assign_training_queue_api():
+    blocked = _auth_block()
+    if blocked:
+        return blocked
+    names, err = _parse_upload()
+    if err:
+        return err
+    queue_id = (request.form.get("queue_id") or "").strip()
+    if not queue_id:
+        return jsonify({"error": "Select a training queue"}), 400
+    apply = request.form.get("apply") == "1"
+    try:
+        client = create_client(log=tool_log)
+        payload = run_assign_to_training_queue(
+            client, names, queue_id=queue_id, apply=apply
+        )
+        return jsonify(payload)
+    except GenesysError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 def register_corporate_training_routes(bp: Blueprint) -> None:
     """Register on ops_bp (primary) and mirror on corporate_training_bp for tests."""
     rules = [
@@ -101,6 +128,7 @@ def register_corporate_training_routes(bp: Blueprint) -> None:
         ("/corporate-training/api/setup", {"methods": ["GET"]}, setup_api),
         ("/corporate-training/api/start-training", {"methods": ["POST"]}, start_training_api),
         ("/corporate-training/api/return-from-training", {"methods": ["POST"]}, return_from_training_api),
+        ("/corporate-training/api/assign-training-queue", {"methods": ["POST"]}, assign_training_queue_api),
     ]
     for path, options, view in rules:
         bp.add_url_rule(path, view_func=view, **options)

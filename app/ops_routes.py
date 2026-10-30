@@ -91,6 +91,13 @@ def corporate_training_return():
     return return_from_training_api()
 
 
+@ops_bp.route("/corporate-training/api/assign-training-queue", methods=["POST"])
+def corporate_training_assign():
+    from app.corporate_training.routes import assign_training_queue_api
+
+    return assign_training_queue_api()
+
+
 @ops_bp.route("/queue-performance/logout")
 def queue_performance_logout():
     from app.agent_workspace.oauth import clear_session

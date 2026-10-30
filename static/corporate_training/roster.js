@@ -47,7 +47,7 @@
     var stats = payload.stats || {};
     var summary = document.createElement("div");
     summary.className = "summary";
-    summary.textContent =
+    var summaryText =
       (payload.apply ? "APPLY" : "PREVIEW") +
       " — " +
       payload.input_count +
@@ -56,6 +56,10 @@
       " ok, " +
       (stats.error || 0) +
       " errors";
+    if (payload.target_queue_name) {
+      summaryText += " → " + payload.target_queue_name;
+    }
+    summary.textContent = summaryText;
 
     var table = document.createElement("table");
     var thead = document.createElement("thead");
@@ -85,7 +89,7 @@
     el.appendChild(table);
   }
 
-  function postWorkflow(endpoint, fileInput, apply, resultId, applyBtn) {
+  function postWorkflow(endpoint, fileInput, apply, resultId, applyBtn, extraFields) {
     var file = fileInput.files && fileInput.files[0];
     if (!file) {
       renderResult(resultId, { error: "Choose an Excel file first." }, true);
@@ -93,6 +97,11 @@
     }
     var form = new FormData();
     form.append("file", file);
+    if (extraFields) {
+      Object.keys(extraFields).forEach(function (key) {
+        form.append(key, extraFields[key]);
+      });
+    }
     if (apply) {
       form.append("apply", "1");
     }
@@ -165,13 +174,33 @@
           return;
         }
         var list = $("queue-list");
-        if (!list) return;
-        var names = (pack.body.training_queues || []).join("<br>");
-        list.innerHTML =
-          "<strong>" +
-          pack.body.training_queue_count +
-          " corporate training queues</strong><br>" +
-          names;
+        var select = $("assign-queue");
+        var queues = pack.body.training_queues || [];
+        if (list) {
+          var labels = queues.map(function (q) {
+            return typeof q === "string" ? q : q.name;
+          });
+          list.innerHTML =
+            "<strong>" +
+            pack.body.training_queue_count +
+            " corporate training queues</strong><br>" +
+            labels.join("<br>");
+        }
+        if (select) {
+          select.innerHTML = "";
+          var placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "— Select training queue —";
+          select.appendChild(placeholder);
+          queues.forEach(function (q) {
+            if (!q || !q.id) return;
+            var opt = document.createElement("option");
+            opt.value = q.id;
+            opt.textContent = q.name || q.id;
+            select.appendChild(opt);
+          });
+          select.disabled = queues.length === 0;
+        }
       })
       .catch(function (err) {
         showBanner(
@@ -189,8 +218,21 @@
     var btnStartApply = $("btn-start-apply");
     var btnReturnPreview = $("btn-return-preview");
     var btnReturnApply = $("btn-return-apply");
+    var fileAssign = $("file-assign");
+    var assignQueue = $("assign-queue");
+    var btnAssignPreview = $("btn-assign-preview");
+    var btnAssignApply = $("btn-assign-apply");
 
     loadSetup();
+
+    function assignExtraFields() {
+      var qid = assignQueue && assignQueue.value;
+      if (!qid) {
+        renderResult("result-assign", { error: "Select a training queue first." }, true);
+        return null;
+      }
+      return { queue_id: qid };
+    }
 
     btnStartPreview.addEventListener("click", function () {
       btnStartApply.disabled = true;
@@ -216,5 +258,26 @@
     fileReturn.addEventListener("change", function () {
       btnReturnApply.disabled = true;
     });
+
+    btnAssignPreview.addEventListener("click", function () {
+      var extra = assignExtraFields();
+      if (!extra) return;
+      btnAssignApply.disabled = true;
+      postWorkflow("api/assign-training-queue", fileAssign, false, "result-assign", btnAssignApply, extra);
+    });
+    btnAssignApply.addEventListener("click", function () {
+      var extra = assignExtraFields();
+      if (!extra) return;
+      if (!window.confirm("Assign roster to " + (assignQueue.selectedOptions[0].textContent || "training queue") + "?")) return;
+      postWorkflow("api/assign-training-queue", fileAssign, true, "result-assign", btnAssignApply, extra);
+    });
+    fileAssign.addEventListener("change", function () {
+      btnAssignApply.disabled = true;
+    });
+    if (assignQueue) {
+      assignQueue.addEventListener("change", function () {
+        btnAssignApply.disabled = true;
+      });
+    }
   });
 })();

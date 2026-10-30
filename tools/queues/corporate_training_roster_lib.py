@@ -7,8 +7,8 @@ from typing import Any, BinaryIO
 
 from openpyxl import load_workbook
 
-from core.genesys_client import GenesysClient, safe_str
-from core.lookups import get_all_queues
+from core.genesys_client import GenesysClient, GenesysError, safe_str
+from core.lookups import get_all_queues, user_is_queue_member
 from tools.queues.user_name_resolve import (
     build_user_indexes,
     normalize_person_name,
@@ -337,6 +337,171 @@ def run_return_from_training(
         "apply": apply,
         "training_queue_count": len(training_queues),
         "training_queues": [safe_str(q.get("name")) for q in training_queues],
+        "input_count": len(names),
+        "stats": stats,
+        "rows": rows,
+    }
+
+
+def resolve_training_queue(
+    client: GenesysClient,
+    queue_id: str,
+    training_queues: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    training_queues = training_queues if training_queues is not None else list_corporate_training_queues(client)
+    wanted = safe_str(queue_id)
+    for queue in training_queues:
+        if safe_str(queue.get("id")) == wanted:
+            return queue
+    return None
+
+
+def _ensure_joined_training_member(
+    client: GenesysClient,
+    *,
+    queue: dict[str, Any],
+    user: dict[str, Any],
+    apply: bool,
+) -> tuple[str, str]:
+    queue_id = safe_str(queue.get("id"))
+    queue_name = safe_str(queue.get("name"))
+    uid = safe_str(user.get("id"))
+    member = user_is_queue_member(client, queue_id, uid)
+    if member:
+        if member.get("joined"):
+            return "skipped_already_joined", f"already joined on {queue_name}"
+        if not apply:
+            return "would_set_joined", f"would set joined=true on {queue_name}"
+        client.request(
+            "PATCH",
+            f"/api/v2/users/{uid}/queues/{queue_id}",
+            json_body={"joined": True},
+        )
+        return "updated_joined", f"joined=true on {queue_name}"
+
+    if not apply:
+        return "would_add_member", f"would add to {queue_name} with joined=true"
+
+    client.request(
+        "POST",
+        f"/api/v2/routing/queues/{queue_id}/members",
+        json_body=[{"id": uid}],
+        expected_statuses=[200, 201, 202],
+    )
+    client.request(
+        "PATCH",
+        f"/api/v2/users/{uid}/queues/{queue_id}",
+        json_body={"joined": True},
+    )
+    return "added_member", f"added to {queue_name} with joined=true"
+
+
+def run_assign_to_training_queue(
+    client: GenesysClient,
+    names: list[str],
+    *,
+    queue_id: str,
+    apply: bool,
+    training_queues: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Add each agent to the selected corporate training queue with joined=true."""
+    training_queues = training_queues if training_queues is not None else list_corporate_training_queues(client)
+    target = resolve_training_queue(client, queue_id, training_queues)
+    if not target:
+        raise GenesysError(f"Not a corporate training queue: {queue_id}")
+
+    target_name = safe_str(target.get("name"))
+    target_id = safe_str(target.get("id"))
+    users, by_name = build_user_indexes(client)
+
+    rows: list[dict[str, Any]] = []
+    stats = {
+        "ok": 0,
+        "error": 0,
+        "added": 0,
+        "joined_updated": 0,
+        "already_joined": 0,
+        "would_add": 0,
+        "would_join": 0,
+    }
+
+    for input_name in names:
+        user, resolve_detail = _resolve_input_name(
+            client, input_name, users=users, by_name=by_name
+        )
+        if not user:
+            rows.append(
+                {
+                    "input_name": input_name,
+                    "user_id": "",
+                    "user_name": "",
+                    "user_email": "",
+                    "status": "error",
+                    "training_queues": target_name,
+                    "production_queues": "",
+                    "actions": "",
+                    "detail": resolve_detail,
+                }
+            )
+            stats["error"] += 1
+            continue
+
+        try:
+            action, action_detail = _ensure_joined_training_member(
+                client,
+                queue=target,
+                user=user,
+                apply=apply,
+            )
+        except GenesysError as exc:
+            rows.append(
+                {
+                    "input_name": input_name,
+                    "user_id": safe_str(user.get("id")),
+                    "user_name": safe_str(user.get("name")),
+                    "user_email": safe_str(user.get("email")),
+                    "status": "error",
+                    "training_queues": target_name,
+                    "production_queues": "",
+                    "actions": "",
+                    "detail": str(exc),
+                }
+            )
+            stats["error"] += 1
+            continue
+
+        if action == "skipped_already_joined":
+            stats["already_joined"] += 1
+        elif action == "added_member":
+            stats["added"] += 1
+        elif action == "updated_joined":
+            stats["joined_updated"] += 1
+        elif action == "would_add_member":
+            stats["would_add"] += 1
+        elif action == "would_set_joined":
+            stats["would_join"] += 1
+
+        rows.append(
+            {
+                "input_name": input_name,
+                "user_id": safe_str(user.get("id")),
+                "user_name": safe_str(user.get("name")),
+                "user_email": safe_str(user.get("email")),
+                "status": "ok",
+                "training_queues": target_name,
+                "production_queues": "",
+                "actions": action_detail,
+                "detail": resolve_detail,
+            }
+        )
+        stats["ok"] += 1
+
+    return {
+        "mode": "assign_training_queue",
+        "apply": apply,
+        "target_queue_id": target_id,
+        "target_queue_name": target_name,
+        "training_queue_count": len(training_queues),
         "input_count": len(names),
         "stats": stats,
         "rows": rows,

@@ -12,6 +12,7 @@ from core.cli import add_apply_arg, add_env_arg, create_client, print_mode_banne
 from tools.queues.corporate_training_roster_lib import (
     RESULT_FIELDS,
     parse_names_from_workbook,
+    run_assign_to_training_queue,
     run_return_from_training,
     run_start_training,
 )
@@ -21,11 +22,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Corporate training roster queue updates.")
     parser.add_argument(
         "mode",
-        choices=("start-training", "return-from-training"),
+        choices=("start-training", "return-from-training", "assign-training-queue"),
         help="start-training: verify training membership, joined=false on production; "
-        "return-from-training: remove from training, joined=true on production",
+        "return-from-training: remove from training, joined=true on production; "
+        "assign-training-queue: add roster to one training queue with joined=true",
     )
     parser.add_argument("--input", required=True, type=Path, help="Excel .xlsx with a Name/Agent/Email column")
+    parser.add_argument("--queue-id", help="Corporate training queue id (required for assign-training-queue)")
     add_apply_arg(parser)
     add_env_arg(parser)
     args = parser.parse_args()
@@ -41,8 +44,15 @@ def main() -> int:
     client = create_client(log=tool_log, env_file=args.env_file)
     if args.mode == "start-training":
         payload = run_start_training(client, names, apply=args.apply)
-    else:
+    elif args.mode == "return-from-training":
         payload = run_return_from_training(client, names, apply=args.apply)
+    else:
+        if not args.queue_id:
+            tool_log("error", "--queue-id is required for assign-training-queue")
+            return 1
+        payload = run_assign_to_training_queue(
+            client, names, queue_id=args.queue_id, apply=args.apply
+        )
 
     out = write_csv(
         f"corporate_training_{payload['mode']}_{'apply' if args.apply else 'dry'}.csv",

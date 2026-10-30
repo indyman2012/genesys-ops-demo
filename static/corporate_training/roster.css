@@ -57,6 +57,27 @@ h2 { margin: 0 0 10px; font-size: 18px; }
   align-items: center;
 }
 
+.field {
+  margin-bottom: 14px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.field select {
+  width: 100%;
+  max-width: 520px;
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #d0d7e0;
+  border-radius: 8px;
+  background: #fff;
+}
+
 button {
   border: none;
   border-radius: 8px;
