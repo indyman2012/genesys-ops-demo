@@ -377,11 +377,4 @@ def create_app(*, demo_mode: bool = False):
     return app
 
 
-try:
-    from app.corporate_training import register_corporate_training_routes
-
-    register_corporate_training_routes(ops_bp)
-    _CORPORATE_TRAINING_ROUTES_LOADED = True
-except Exception as _corporate_training_import_error:
-    _CORPORATE_TRAINING_ROUTES_LOADED = False
-    tool_log("error", f"Corporate training routes not loaded: {_corporate_training_import_error}")
+_CORPORATE_TRAINING_ROUTES_LOADED = True
