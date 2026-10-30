@@ -98,6 +98,29 @@ def _wants_json_api_response() -> bool:
     return False
 
 
+def _oauth_return_path() -> str:
+    from flask import request
+
+    path = request.path or ""
+    if path.startswith("/corporate-training") or "/corporate-training/" in path:
+        return "/corporate-training/"
+    next_url = request.full_path if request.query_string else path
+    if next_url.endswith("?"):
+        next_url = next_url[:-1]
+    return next_url or "/queue-performance"
+
+
+def _queue_performance_login_url(*, return_to: str | None = None) -> str:
+    from flask import url_for
+
+    target = (return_to or _oauth_return_path()).strip() or "/queue-performance"
+    if target.startswith("/corporate-training"):
+        return url_for("agent.oauth_login", for="queue-performance", next="/corporate-training/")
+    if target != "/queue-performance":
+        return url_for("agent.oauth_login", for="queue-performance", next=target)
+    return url_for("agent.oauth_login", for="queue-performance")
+
+
 def require_queue_performance_access():
     from flask import jsonify, redirect, render_template, request, session, url_for
 
@@ -106,17 +129,11 @@ def require_queue_performance_access():
     if not queue_performance_auth_enabled():
         return None
 
-    login_url = url_for("agent.oauth_login", **{"for": "queue-performance"})
-
     if not is_genesys_authenticated(session):
-        next_url = request.full_path if request.query_string else request.path
-        if next_url.endswith("?"):
-            next_url = next_url[:-1]
+        return_to = _oauth_return_path()
         session["oauth_for"] = "queue-performance"
-        if next_url.startswith("/corporate-training"):
-            session["oauth_next"] = "/corporate-training/"
-        else:
-            session["oauth_next"] = next_url or "/queue-performance"
+        session["oauth_next"] = return_to
+        login_url = _queue_performance_login_url(return_to=return_to)
         if _wants_json_api_response():
             return jsonify({"error": "Sign in required", "login_url": login_url}), 401
         return redirect(login_url)

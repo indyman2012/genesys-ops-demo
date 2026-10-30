@@ -202,7 +202,11 @@ def oauth_login():
         session["oauth_for"] = "site-picker"
     elif oauth_for == "queue-performance":
         session["oauth_for"] = "queue-performance"
-        next_url = (request.args.get("next") or "/queue-performance").strip()
+        next_url = (
+            request.args.get("next")
+            or session.get("oauth_next")
+            or "/queue-performance"
+        ).strip()
         session["oauth_next"] = next_url or "/queue-performance"
 
     try:
