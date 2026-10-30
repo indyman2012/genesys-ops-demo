@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 
 from core.genesys_client import GenesysClient, safe_str
 from core.lookups import get_all_queues
-from tools.queues.rfc_queue_provision_from_xlsx import (
+from tools.queues.user_name_resolve import (
     build_user_indexes,
     normalize_person_name,
     resolve_user,
