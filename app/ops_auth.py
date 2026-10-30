@@ -115,10 +115,16 @@ def _queue_performance_login_url(*, return_to: str | None = None) -> str:
 
     target = (return_to or _oauth_return_path()).strip() or "/queue-performance"
     if target.startswith("/corporate-training"):
-        return url_for("agent.oauth_login", for="queue-performance", next="/corporate-training/")
+        return url_for(
+            "agent.oauth_login",
+            **{"for": "queue-performance", "next": "/corporate-training/"},
+        )
     if target != "/queue-performance":
-        return url_for("agent.oauth_login", for="queue-performance", next=target)
-    return url_for("agent.oauth_login", for="queue-performance")
+        return url_for(
+            "agent.oauth_login",
+            **{"for": "queue-performance", "next": target},
+        )
+    return url_for("agent.oauth_login", **{"for": "queue-performance"})
 
 
 def require_queue_performance_access():
