@@ -14,11 +14,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from app.ops_routes import create_app
 from app.agent_workspace.routes import agent_bp
 from app.site_picker.routes import site_picker_bp
-from core.app_modes import finalize_combined_agent_mode
+from core.app_modes import apply_combined_deploy_modes
 
-os.environ.setdefault("AGENT_DEMO_MODE", "0")
 app = create_app(demo_mode=True)
-finalize_combined_agent_mode(app)
+apply_combined_deploy_modes(app)
 app.register_blueprint(agent_bp)
 app.register_blueprint(site_picker_bp, url_prefix="/site-picker")
 

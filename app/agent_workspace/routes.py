@@ -195,12 +195,12 @@ def reports_aht_trend():
 def health():
     from flask import current_app
 
-    from core.app_modes import demo_mode_health_payload
+    from core.app_modes import agent_workspace_health_payload
 
     return jsonify({
         "ok": True,
         "app": "GenesysToolkit",
-        **demo_mode_health_payload(current_app),
+        **agent_workspace_health_payload(current_app),
         "authenticated": _is_authenticated(),
         "service": "agent-workspace",
     })

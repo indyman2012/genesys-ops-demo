@@ -48,11 +48,19 @@ def apply_split_demo_config(app: Flask, *, ops_demo: bool) -> None:
     app.config["DEMO_MODE"] = ops_demo
 
 
-def finalize_combined_agent_mode(app: Flask) -> None:
-    """Re-apply agent mode from env after ops create_app (genesys_toolkit_app entry)."""
-    agent_demo = agent_demo_from_env()
-    if agent_demo is not None:
-        app.config["AGENT_DEMO_MODE"] = agent_demo
+def apply_combined_deploy_modes(app: Flask) -> None:
+    """genesys_toolkit_app: ops dry-run + live /agent.
+
+    Stale Render env (e.g. AGENT_DEMO_MODE=1) must not re-enable simulation on this entry.
+    Simulated agent UI remains on agent_app_demo.py.
+    """
+    app.config["GENESYS_COMBINED_DEPLOY"] = True
+    app.config["OPS_DEMO_MODE"] = True
+    app.config["DEMO_MODE"] = True
+    if env_bool("GENESYS_TOOLKIT_FORCE_AGENT_DEMO") is True:
+        app.config["AGENT_DEMO_MODE"] = True
+    else:
+        app.config["AGENT_DEMO_MODE"] = False
 
 
 def demo_mode_health_payload(app: Flask) -> dict[str, object]:
@@ -60,6 +68,7 @@ def demo_mode_health_payload(app: Flask) -> dict[str, object]:
     ops_env = (os.environ.get("OPS_DEMO_MODE") or "").strip()
     agent_cfg = app.config.get("AGENT_DEMO_MODE")
     ops_cfg = app.config.get("OPS_DEMO_MODE")
+    combined = bool(app.config.get("GENESYS_COMBINED_DEPLOY"))
     return {
         "demo_mode": coerce_bool(ops_cfg, default=coerce_bool(app.config.get("DEMO_MODE"))),
         "ops_demo_mode": coerce_bool(ops_cfg, default=coerce_bool(app.config.get("DEMO_MODE"))),
@@ -67,4 +76,13 @@ def demo_mode_health_payload(app: Flask) -> dict[str, object]:
         "ops_demo_mode_env": ops_env or None,
         "agent_demo_mode_env": agent_env or None,
         "agent_demo_mode_env_parsed": agent_demo_from_env(),
+        "genesys_combined_deploy": combined,
+        "agent_demo_mode_env_applied": not combined,
     }
+
+
+def agent_workspace_health_payload(app: Flask) -> dict[str, object]:
+    base = demo_mode_health_payload(app)
+    agent_demo = coerce_bool(app.config.get("AGENT_DEMO_MODE"))
+    base["demo_mode"] = agent_demo
+    return base
