@@ -1,18 +1,15 @@
 (function () {
   "use strict";
 
-  var scriptEl = document.querySelector("script[src*='roster.js']");
-  var API_BASE = "/corporate-training/";
-  if (scriptEl && scriptEl.src) {
-    try {
-      API_BASE = new URL(scriptEl.src).pathname.replace(/assets\/roster\.js$/, "");
-    } catch (_e) {
-      API_BASE = "/corporate-training/";
+  var API_BASE = (function () {
+    var path = window.location.pathname || "";
+    var marker = "/corporate-training";
+    var idx = path.indexOf(marker);
+    if (idx >= 0) {
+      return path.slice(0, idx + marker.length) + "/";
     }
-  }
-  if (!API_BASE.endsWith("/")) {
-    API_BASE += "/";
-  }
+    return "/corporate-training/";
+  })();
 
   function $(id) {
     return document.getElementById(id);
@@ -104,12 +101,9 @@
       method: "POST",
       body: form,
       credentials: "same-origin",
+      headers: { Accept: "application/json" },
     })
-      .then(function (res) {
-        return res.json().then(function (body) {
-          return { ok: res.ok, body: body, status: res.status };
-        });
-      })
+      .then(parseJsonResponse)
       .then(function (pack) {
         if (pack.status === 401 && pack.body.login_url) {
           showBanner(
@@ -138,13 +132,26 @@
       });
   }
 
+  function parseJsonResponse(res) {
+    return res.text().then(function (text) {
+      try {
+        return { ok: res.ok, body: JSON.parse(text), status: res.status };
+      } catch (_e) {
+        return {
+          ok: false,
+          status: res.status,
+          body: { error: res.status === 401 ? "Sign in required" : "Unexpected server response" },
+        };
+      }
+    });
+  }
+
   function loadSetup() {
-    return fetch(apiUrl("api/setup"), { credentials: "same-origin" })
-      .then(function (res) {
-        return res.json().then(function (body) {
-          return { ok: res.ok, body: body, status: res.status };
-        });
-      })
+    return fetch(apiUrl("api/setup"), {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(parseJsonResponse)
       .then(function (pack) {
         if (pack.status === 401 && pack.body.login_url) {
           showBanner(
@@ -166,8 +173,12 @@
           " corporate training queues</strong><br>" +
           names;
       })
-      .catch(function () {
-        showBanner("err", "Could not reach the ops API. Open this page from /corporate-training/ on the toolkit server.");
+      .catch(function (err) {
+        showBanner(
+          "err",
+          "Could not reach the training API (" + escapeHtml(String(err)) + "). Use " +
+            "<a href=\"/corporate-training/\">/corporate-training/</a> on the ops site."
+        );
       });
   }
 

@@ -83,6 +83,21 @@ def queue_performance_access_granted(session: dict[str, Any]) -> bool:
     return bool(session.get(SESSION_ACCESS_KEY))
 
 
+def _wants_json_api_response() -> bool:
+    """True for XHR/fetch endpoints (including /corporate-training/api/*, not only /api/*)."""
+    from flask import request
+
+    path = request.path or ""
+    if path.startswith("/api/") or "/api/" in path:
+        return True
+    accept = (request.headers.get("Accept") or "").lower()
+    if "application/json" in accept:
+        return True
+    if (request.headers.get("X-Requested-With") or "").lower() == "xmlhttprequest":
+        return True
+    return False
+
+
 def require_queue_performance_access():
     from flask import jsonify, redirect, render_template, request, session, url_for
 
@@ -98,8 +113,11 @@ def require_queue_performance_access():
         if next_url.endswith("?"):
             next_url = next_url[:-1]
         session["oauth_for"] = "queue-performance"
-        session["oauth_next"] = next_url or "/queue-performance"
-        if request.path.startswith("/api/"):
+        if next_url.startswith("/corporate-training"):
+            session["oauth_next"] = "/corporate-training/"
+        else:
+            session["oauth_next"] = next_url or "/queue-performance"
+        if _wants_json_api_response():
             return jsonify({"error": "Sign in required", "login_url": login_url}), 401
         return redirect(login_url)
 
@@ -110,7 +128,7 @@ def require_queue_performance_access():
         client = create_client(log=tool_log)
         allowed, role_names, matched = sync_queue_performance_access(session, client)
     except Exception as exc:
-        if request.path.startswith("/api/"):
+        if _wants_json_api_response():
             return jsonify({"error": f"Could not verify Genesys roles: {exc}"}), 502
         return (
             render_template(
@@ -129,7 +147,7 @@ def require_queue_performance_access():
         return None
 
     required = sorted(allowed_role_names())
-    if request.path.startswith("/api/"):
+    if _wants_json_api_response():
         return jsonify({
             "error": "Access denied",
             "required_roles": required,
