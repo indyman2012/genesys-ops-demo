@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Corporate Training Queue Roster</title>
+  <link rel="stylesheet" href="assets/roster.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <h1>Corporate Training Queue Roster</h1>
+        <p class="sub">
+          Upload an Excel list of agent names (one column: Name, Agent, or Email).
+          Changes run against Genesys using server credentials after you sign in.
+        </p>
+      </header>
+      <div class="body">
+        <div id="auth-banner" class="banner info" style="display:none"></div>
+        <div id="queue-list" class="queue-list"></div>
+
+        <section class="workflow">
+          <h2>1 — Start training (pause production queues)</h2>
+          <p class="help">
+            Confirms each person is on at least one <strong>Corporate Training</strong> queue.
+            For any other queue where they are <strong>joined</strong>, sets <code>joined=false</code>
+            so they receive training calls only.
+          </p>
+          <div class="row">
+            <input type="file" id="file-start" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <button type="button" class="secondary" id="btn-start-preview">Preview</button>
+            <button type="button" class="primary" id="btn-start-apply" disabled>Apply changes</button>
+          </div>
+          <div id="result-start" class="result"></div>
+        </section>
+
+        <section class="workflow">
+          <h2>2 — Return from training</h2>
+          <p class="help">
+            Removes each person from every corporate training queue, then sets
+            <code>joined=true</code> on their production queues (non-training memberships).
+          </p>
+          <div class="row">
+            <input type="file" id="file-return" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <button type="button" class="secondary" id="btn-return-preview">Preview</button>
+            <button type="button" class="primary" id="btn-return-apply" disabled>Apply changes</button>
+          </div>
+          <div id="result-return" class="result"></div>
+        </section>
+
+        <details>
+          <summary>Hosting &amp; sign-in</summary>
+          <div class="inner">
+            <p>Open this page from your GenesysCloudToolkit ops site at <code>/corporate-training/</code> (not as a local file).</p>
+            <p>Sign in with a Genesys supervisor/admin account when prompted. Preview runs are safe; Apply performs live updates.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+  <script src="assets/roster.js"></script>
+</body>
+</html>
