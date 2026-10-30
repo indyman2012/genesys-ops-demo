@@ -56,6 +56,41 @@ def queue_performance_page():
     )
 
 
+_CORPORATE_TRAINING_STATIC = PROJECT_ROOT / "static" / "corporate_training"
+
+
+@ops_bp.route("/corporate-training")
+@ops_bp.route("/corporate-training/")
+def corporate_training_page():
+    return send_from_directory(_CORPORATE_TRAINING_STATIC, "index.html")
+
+
+@ops_bp.route("/corporate-training/assets/<path:filename>")
+def corporate_training_asset(filename: str):
+    return send_from_directory(_CORPORATE_TRAINING_STATIC, filename)
+
+
+@ops_bp.route("/corporate-training/api/setup")
+def corporate_training_setup():
+    from app.corporate_training.routes import setup_api
+
+    return setup_api()
+
+
+@ops_bp.route("/corporate-training/api/start-training", methods=["POST"])
+def corporate_training_start():
+    from app.corporate_training.routes import start_training_api
+
+    return start_training_api()
+
+
+@ops_bp.route("/corporate-training/api/return-from-training", methods=["POST"])
+def corporate_training_return():
+    from app.corporate_training.routes import return_from_training_api
+
+    return return_from_training_api()
+
+
 @ops_bp.route("/queue-performance/logout")
 def queue_performance_logout():
     from app.agent_workspace.oauth import clear_session
