@@ -201,6 +201,7 @@ def health():
             "admin_credentials_set": probe.get("GENESYS_CLIENT_ID") and probe.get("GENESYS_CLIENT_SECRET"),
             "agent_credentials_set": agent_credentials_present(),
             "corporate_training_routes": corporate_routes,
+            "corporate_training_loaded": _CORPORATE_TRAINING_ROUTES_LOADED,
         })
     except Exception as exc:
         return jsonify({
@@ -336,8 +337,16 @@ def create_app(*, demo_mode: bool = False):
     app.config["SESSION_COOKIE_SECURE"] = on_render or os.environ.get("FLASK_SECURE_COOKIES") == "1"
     app.register_blueprint(ops_bp)
     from app.ask_genesys import ask_bp
-    from app.corporate_training import corporate_training_bp
 
     app.register_blueprint(ask_bp)
-    app.register_blueprint(corporate_training_bp)
     return app
+
+
+try:
+    from app.corporate_training import register_corporate_training_routes
+
+    register_corporate_training_routes(ops_bp)
+    _CORPORATE_TRAINING_ROUTES_LOADED = True
+except Exception as _corporate_training_import_error:
+    _CORPORATE_TRAINING_ROUTES_LOADED = False
+    tool_log("error", f"Corporate training routes not loaded: {_corporate_training_import_error}")

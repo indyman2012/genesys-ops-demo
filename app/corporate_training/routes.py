@@ -18,13 +18,10 @@ corporate_training_bp = Blueprint("corporate_training", __name__)
 STATIC_DIR = PROJECT_ROOT / "static" / "corporate_training"
 
 
-@corporate_training_bp.route("/corporate-training")
-@corporate_training_bp.route("/corporate-training/")
 def index_page():
     return send_from_directory(STATIC_DIR, "index.html")
 
 
-@corporate_training_bp.route("/corporate-training/assets/<path:filename>")
 def static_assets(filename: str):
     return send_from_directory(STATIC_DIR, filename)
 
@@ -46,7 +43,6 @@ def _parse_upload() -> tuple[list[str] | None, Any]:
     return names, None
 
 
-@corporate_training_bp.route("/corporate-training/api/setup")
 def setup_api():
     blocked = _auth_block()
     if blocked:
@@ -64,7 +60,6 @@ def setup_api():
         return jsonify({"error": str(exc)}), 500
 
 
-@corporate_training_bp.route("/corporate-training/api/start-training", methods=["POST"])
 def start_training_api():
     blocked = _auth_block()
     if blocked:
@@ -81,7 +76,6 @@ def start_training_api():
         return jsonify({"error": str(exc)}), 500
 
 
-@corporate_training_bp.route("/corporate-training/api/return-from-training", methods=["POST"])
 def return_from_training_api():
     blocked = _auth_block()
     if blocked:
@@ -96,3 +90,18 @@ def return_from_training_api():
         return jsonify(payload)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+def register_corporate_training_routes(bp: Blueprint) -> None:
+    """Register on ops_bp (primary) and mirror on corporate_training_bp for tests."""
+    rules = [
+        ("/corporate-training/", {"methods": ["GET"]}, index_page),
+        ("/corporate-training", {"methods": ["GET"]}, index_page),
+        ("/corporate-training/assets/<path:filename>", {"methods": ["GET"]}, static_assets),
+        ("/corporate-training/api/setup", {"methods": ["GET"]}, setup_api),
+        ("/corporate-training/api/start-training", {"methods": ["POST"]}, start_training_api),
+        ("/corporate-training/api/return-from-training", {"methods": ["POST"]}, return_from_training_api),
+    ]
+    for path, options, view in rules:
+        bp.add_url_rule(path, view_func=view, **options)
+        corporate_training_bp.add_url_rule(path, view_func=view, **options)
