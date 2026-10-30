@@ -8,18 +8,13 @@ from typing import Any, BinaryIO
 from openpyxl import load_workbook
 
 from core.genesys_client import GenesysClient, GenesysError, safe_str
-from core.lookups import get_all_queues, user_is_queue_member
-from tools.queues.user_name_resolve import (
-    build_user_indexes,
-    normalize_person_name,
-    resolve_user,
-)
+from core.lookups import find_user_by_email, get_all_queues, user_is_queue_member
 
 TRAINING_NAME_FRAGMENT = "corporate training"
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 RESULT_FIELDS = [
-    "input_name",
+    "input_email",
     "user_id",
     "user_name",
     "user_email",
@@ -49,7 +44,17 @@ def _training_queue_ids(queues: list[dict[str, Any]]) -> set[str]:
     return {safe_str(q["id"]) for q in queues if q.get("id")}
 
 
-def parse_names_from_workbook(source: BinaryIO | bytes) -> list[str]:
+def normalize_roster_email(value: str) -> str:
+    return safe_str(value).strip().lower()
+
+
+def _split_email_cell(raw: str) -> list[str]:
+    parts = re.split(r"[,;\s]+", raw)
+    return [normalize_roster_email(p) for p in parts if normalize_roster_email(p)]
+
+
+def parse_emails_from_workbook(source: BinaryIO | bytes) -> list[str]:
+    """Read work emails from the first sheet (column headed Email or first column)."""
     data = source.read() if hasattr(source, "read") else source
     wb = load_workbook(BytesIO(data), read_only=True, data_only=True)
     ws = wb.active
@@ -59,30 +64,31 @@ def parse_names_from_workbook(source: BinaryIO | bytes) -> list[str]:
         return []
 
     header = [safe_str(cell).strip().lower() for cell in rows[0]]
-    name_col = 0
+    email_col = 0
     for idx, label in enumerate(header):
-        if label in {"name", "agent", "agents", "employee", "email"} or "name" in label:
-            name_col = idx
+        if label in {"email", "e-mail", "work email", "email address", "mail"} or "email" in label:
+            email_col = idx
             break
 
     seen: set[str] = set()
-    names: list[str] = []
+    emails: list[str] = []
     start = 1 if any(header) else 0
     for row in rows[start:]:
-        if not row or name_col >= len(row):
+        if not row or email_col >= len(row):
             continue
-        raw = safe_str(row[name_col]).strip()
-        if not raw or raw.lower() in {"name", "agent", "email"}:
+        raw = safe_str(row[email_col]).strip()
+        if not raw or raw.lower() in {"email", "e-mail", "work email", "email address"}:
             continue
-        for piece in re.split(r"\s+and\s+", raw, flags=re.IGNORECASE):
-            normalized = normalize_person_name(piece)
-            if not normalized:
-                continue
-            key = normalized.lower()
-            if key not in seen:
-                seen.add(key)
-                names.append(normalized)
-    return names
+        for addr in _split_email_cell(raw):
+            if addr not in seen:
+                seen.add(addr)
+                emails.append(addr)
+    return emails
+
+
+def parse_names_from_workbook(source: BinaryIO | bytes) -> list[str]:
+    """Backward-compatible alias — roster workbooks are email-based."""
+    return parse_emails_from_workbook(source)
 
 
 def _user_queue_rows(client: GenesysClient, user_id: str) -> list[dict[str, Any]]:
@@ -113,27 +119,21 @@ def _queue_label(row: dict[str, Any]) -> str:
     return f"{name}{suffix}"
 
 
-def _resolve_input_name(
-    client: GenesysClient,
-    input_name: str,
-    *,
-    users: list[dict[str, Any]],
-    by_name: dict[str, list[dict[str, Any]]],
-) -> tuple[dict[str, Any] | None, str]:
-    user, _method, detail = resolve_user(
-        input_name,
-        client=client,
-        users=users,
-        by_name=by_name,
-    )
-    if user:
-        return user, detail
-    return None, detail or "user not found"
+def _resolve_input_email(client: GenesysClient, input_email: str) -> tuple[dict[str, Any] | None, str]:
+    normalized = normalize_roster_email(input_email)
+    if not normalized:
+        return None, "empty email"
+    if not EMAIL_PATTERN.match(normalized):
+        return None, f"invalid email address: {input_email}"
+    try:
+        return find_user_by_email(client, normalized), ""
+    except GenesysError as exc:
+        return None, str(exc)
 
 
 def run_start_training(
     client: GenesysClient,
-    names: list[str],
+    emails: list[str],
     *,
     apply: bool,
     training_queues: list[dict[str, Any]] | None = None,
@@ -141,19 +141,16 @@ def run_start_training(
     """Verify training queue membership; set joined=false on production queues."""
     training_queues = training_queues if training_queues is not None else list_corporate_training_queues(client)
     training_ids = _training_queue_ids(training_queues)
-    users, by_name = build_user_indexes(client)
 
     rows: list[dict[str, Any]] = []
     stats = {"ok": 0, "error": 0, "production_joined_cleared": 0, "would_clear": 0}
 
-    for input_name in names:
-        user, resolve_detail = _resolve_input_name(
-            client, input_name, users=users, by_name=by_name
-        )
+    for input_email in emails:
+        user, resolve_detail = _resolve_input_email(client, input_email)
         if not user:
             rows.append(
                 {
-                    "input_name": input_name,
+                    "input_email": input_email,
                     "user_id": "",
                     "user_name": "",
                     "user_email": "",
@@ -174,7 +171,7 @@ def run_start_training(
         if not training:
             rows.append(
                 {
-                    "input_name": input_name,
+                    "input_email": input_email,
                     "user_id": uid,
                     "user_name": safe_str(user.get("name")),
                     "user_email": safe_str(user.get("email")),
@@ -208,7 +205,7 @@ def run_start_training(
 
         rows.append(
             {
-                "input_name": input_name,
+                "input_email": input_email,
                 "user_id": uid,
                 "user_name": safe_str(user.get("name")),
                 "user_email": safe_str(user.get("email")),
@@ -226,7 +223,7 @@ def run_start_training(
         "apply": apply,
         "training_queue_count": len(training_queues),
         "training_queues": [safe_str(q.get("name")) for q in training_queues],
-        "input_count": len(names),
+        "input_count": len(emails),
         "stats": stats,
         "rows": rows,
     }
@@ -234,7 +231,7 @@ def run_start_training(
 
 def run_return_from_training(
     client: GenesysClient,
-    names: list[str],
+    emails: list[str],
     *,
     apply: bool,
     training_queues: list[dict[str, Any]] | None = None,
@@ -242,7 +239,6 @@ def run_return_from_training(
     """Remove from corporate training queues; set joined=true on production queues."""
     training_queues = training_queues if training_queues is not None else list_corporate_training_queues(client)
     training_ids = _training_queue_ids(training_queues)
-    users, by_name = build_user_indexes(client)
 
     rows: list[dict[str, Any]] = []
     stats = {
@@ -254,14 +250,12 @@ def run_return_from_training(
         "would_join": 0,
     }
 
-    for input_name in names:
-        user, resolve_detail = _resolve_input_name(
-            client, input_name, users=users, by_name=by_name
-        )
+    for input_email in emails:
+        user, resolve_detail = _resolve_input_email(client, input_email)
         if not user:
             rows.append(
                 {
-                    "input_name": input_name,
+                    "input_email": input_email,
                     "user_id": "",
                     "user_name": "",
                     "user_email": "",
@@ -316,7 +310,7 @@ def run_return_from_training(
 
         rows.append(
             {
-                "input_name": input_name,
+                "input_email": input_email,
                 "user_id": uid,
                 "user_name": safe_str(user.get("name")),
                 "user_email": safe_str(user.get("email")),
@@ -337,7 +331,7 @@ def run_return_from_training(
         "apply": apply,
         "training_queue_count": len(training_queues),
         "training_queues": [safe_str(q.get("name")) for q in training_queues],
-        "input_count": len(names),
+        "input_count": len(emails),
         "stats": stats,
         "rows": rows,
     }
@@ -398,7 +392,7 @@ def _ensure_joined_training_member(
 
 def run_assign_to_training_queue(
     client: GenesysClient,
-    names: list[str],
+    emails: list[str],
     *,
     queue_id: str,
     apply: bool,
@@ -412,7 +406,6 @@ def run_assign_to_training_queue(
 
     target_name = safe_str(target.get("name"))
     target_id = safe_str(target.get("id"))
-    users, by_name = build_user_indexes(client)
 
     rows: list[dict[str, Any]] = []
     stats = {
@@ -425,14 +418,12 @@ def run_assign_to_training_queue(
         "would_join": 0,
     }
 
-    for input_name in names:
-        user, resolve_detail = _resolve_input_name(
-            client, input_name, users=users, by_name=by_name
-        )
+    for input_email in emails:
+        user, resolve_detail = _resolve_input_email(client, input_email)
         if not user:
             rows.append(
                 {
-                    "input_name": input_name,
+                    "input_email": input_email,
                     "user_id": "",
                     "user_name": "",
                     "user_email": "",
@@ -456,7 +447,7 @@ def run_assign_to_training_queue(
         except GenesysError as exc:
             rows.append(
                 {
-                    "input_name": input_name,
+                    "input_email": input_email,
                     "user_id": safe_str(user.get("id")),
                     "user_name": safe_str(user.get("name")),
                     "user_email": safe_str(user.get("email")),
@@ -483,7 +474,7 @@ def run_assign_to_training_queue(
 
         rows.append(
             {
-                "input_name": input_name,
+                "input_email": input_email,
                 "user_id": safe_str(user.get("id")),
                 "user_name": safe_str(user.get("name")),
                 "user_email": safe_str(user.get("email")),
@@ -502,7 +493,7 @@ def run_assign_to_training_queue(
         "target_queue_id": target_id,
         "target_queue_name": target_name,
         "training_queue_count": len(training_queues),
-        "input_count": len(names),
+        "input_count": len(emails),
         "stats": stats,
         "rows": rows,
     }

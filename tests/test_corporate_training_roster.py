@@ -7,7 +7,8 @@ from openpyxl import Workbook
 
 from tools.queues.corporate_training_roster_lib import (
     is_corporate_training_queue_name,
-    parse_names_from_workbook,
+    normalize_roster_email,
+    parse_emails_from_workbook,
 )
 
 
@@ -17,16 +18,26 @@ class CorporateTrainingRosterTests(unittest.TestCase):
         self.assertTrue(is_corporate_training_queue_name("Patient Services - NVL Corporate Training"))
         self.assertFalse(is_corporate_training_queue_name("Sales - NVL - Henderson"))
 
-    def test_parse_names_from_workbook(self):
+    def test_normalize_roster_email(self):
+        self.assertEqual(normalize_roster_email("  User@Example.COM "), "user@example.com")
+
+    def test_parse_emails_from_workbook(self):
         wb = Workbook()
         ws = wb.active
-        ws.append(["Agent Name"])
-        ws.append(["Jane Doe"])
-        ws.append(["John Smith and Mary Jones"])
+        ws.append(["Work Email"])
+        ws.append(["agent.one@archwellhealth.com"])
+        ws.append(["agent.two@archwellhealth.com, agent.three@archwellhealth.com"])
         buf = BytesIO()
         wb.save(buf)
-        names = parse_names_from_workbook(buf.getvalue())
-        self.assertEqual(names, ["Jane Doe", "John Smith", "Mary Jones"])
+        emails = parse_emails_from_workbook(buf.getvalue())
+        self.assertEqual(
+            emails,
+            [
+                "agent.one@archwellhealth.com",
+                "agent.two@archwellhealth.com",
+                "agent.three@archwellhealth.com",
+            ],
+        )
 
 
 if __name__ == "__main__":

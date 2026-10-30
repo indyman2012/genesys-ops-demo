@@ -10,7 +10,7 @@ from core.paths import PROJECT_ROOT
 from core.genesys_client import GenesysError
 from tools.queues.corporate_training_roster_lib import (
     list_corporate_training_queues,
-    parse_names_from_workbook,
+    parse_emails_from_workbook,
     run_assign_to_training_queue,
     run_return_from_training,
     run_start_training,
@@ -37,12 +37,12 @@ def _parse_upload() -> tuple[list[str] | None, Any]:
     if not upload or not upload.filename:
         return None, (jsonify({"error": "Upload an Excel file (.xlsx)"}), 400)
     try:
-        names = parse_names_from_workbook(upload.stream)
+        emails = parse_emails_from_workbook(upload.stream)
     except Exception as exc:
         return None, (jsonify({"error": f"Could not read Excel file: {exc}"}), 400)
-    if not names:
-        return None, (jsonify({"error": "No names found in the spreadsheet"}), 400)
-    return names, None
+    if not emails:
+        return None, (jsonify({"error": "No email addresses found in the spreadsheet"}), 400)
+    return emails, None
 
 
 def setup_api():

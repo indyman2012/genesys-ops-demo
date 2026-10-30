@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from core.cli import add_apply_arg, add_env_arg, create_client, print_mode_banner, setup_path, tool_log, write_csv
 from tools.queues.corporate_training_roster_lib import (
     RESULT_FIELDS,
-    parse_names_from_workbook,
+    parse_emails_from_workbook,
     run_assign_to_training_queue,
     run_return_from_training,
     run_start_training,
@@ -27,7 +27,7 @@ def main() -> int:
         "return-from-training: remove from training, joined=true on production; "
         "assign-training-queue: add roster to one training queue with joined=true",
     )
-    parser.add_argument("--input", required=True, type=Path, help="Excel .xlsx with a Name/Agent/Email column")
+    parser.add_argument("--input", required=True, type=Path, help="Excel .xlsx with an Email column")
     parser.add_argument("--queue-id", help="Corporate training queue id (required for assign-training-queue)")
     add_apply_arg(parser)
     add_env_arg(parser)
@@ -36,22 +36,22 @@ def main() -> int:
     setup_path()
     print_mode_banner("Corporate training roster", apply=args.apply, input=str(args.input))
 
-    names = parse_names_from_workbook(args.input.read_bytes())
-    if not names:
-        tool_log("error", "No names found in spreadsheet")
+    emails = parse_emails_from_workbook(args.input.read_bytes())
+    if not emails:
+        tool_log("error", "No email addresses found in spreadsheet")
         return 1
 
     client = create_client(log=tool_log, env_file=args.env_file)
     if args.mode == "start-training":
-        payload = run_start_training(client, names, apply=args.apply)
+        payload = run_start_training(client, emails, apply=args.apply)
     elif args.mode == "return-from-training":
-        payload = run_return_from_training(client, names, apply=args.apply)
+        payload = run_return_from_training(client, emails, apply=args.apply)
     else:
         if not args.queue_id:
             tool_log("error", "--queue-id is required for assign-training-queue")
             return 1
         payload = run_assign_to_training_queue(
-            client, names, queue_id=args.queue_id, apply=args.apply
+            client, emails, queue_id=args.queue_id, apply=args.apply
         )
 
     out = write_csv(

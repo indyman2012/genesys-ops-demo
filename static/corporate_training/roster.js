@@ -51,7 +51,7 @@
       (payload.apply ? "APPLY" : "PREVIEW") +
       " — " +
       payload.input_count +
-      " names, " +
+      " emails, " +
       stats.ok +
       " ok, " +
       (stats.error || 0) +
@@ -64,7 +64,7 @@
     var table = document.createElement("table");
     var thead = document.createElement("thead");
     thead.innerHTML =
-      "<tr><th>Input</th><th>User</th><th>Status</th><th>Training</th><th>Production</th><th>Actions</th><th>Detail</th></tr>";
+      "<tr><th>Input email</th><th>User</th><th>Status</th><th>Training</th><th>Production</th><th>Actions</th><th>Detail</th></tr>";
     table.appendChild(thead);
     var tbody = document.createElement("tbody");
     (payload.rows || []).forEach(function (row) {
@@ -72,7 +72,7 @@
       if (row.status === "error") tr.className = "error";
       if (row.status === "warn") tr.className = "warn";
       tr.innerHTML =
-        "<td>" + escapeHtml(row.input_name) + "</td>" +
+        "<td>" + escapeHtml(row.input_email || row.input_name) + "</td>" +
         "<td>" + escapeHtml(row.user_name) + "<br><span style=\"color:#666\">" + escapeHtml(row.user_email) + "</span></td>" +
         "<td>" + escapeHtml(row.status) + "</td>" +
         "<td>" + escapeHtml(row.training_queues) + "</td>" +
