@@ -1,6 +1,6 @@
-"""GenesysToolkit — demo web app entry point (dry-run only, port 8081).
+"""GenesysToolkit — combined deploy (ops dry-run + live agent workspace).
 
-Includes Ops Console, Agent Workspace pilot, and Site Picker blueprints.
+Ops console: preview-only (OPS_DEMO_MODE). Agent UI at /agent: live Genesys (AGENT_DEMO_MODE=0).
 Deploy with: gunicorn genesys_toolkit_app:app --bind 0.0.0.0:$PORT
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ from app.ops_routes import create_app
 from app.agent_workspace.routes import agent_bp
 from app.site_picker.routes import site_picker_bp
 
-os.environ.setdefault("AGENT_DEMO_MODE", "1")
+os.environ.setdefault("AGENT_DEMO_MODE", "0")
 app = create_app(demo_mode=True)
 app.register_blueprint(agent_bp)
 app.register_blueprint(site_picker_bp, url_prefix="/site-picker")

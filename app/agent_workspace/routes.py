@@ -32,6 +32,22 @@ from core.paths import PROJECT_ROOT
 agent_bp = Blueprint("agent", __name__, url_prefix="/agent")
 
 
+def _agent_demo_mode() -> bool:
+    from flask import current_app
+
+    if "AGENT_DEMO_MODE" in current_app.config:
+        return bool(current_app.config.get("AGENT_DEMO_MODE"))
+    return bool(current_app.config.get("DEMO_MODE"))
+
+
+def _ops_demo_mode() -> bool:
+    from flask import current_app
+
+    if "OPS_DEMO_MODE" in current_app.config:
+        return bool(current_app.config.get("OPS_DEMO_MODE"))
+    return bool(current_app.config.get("DEMO_MODE"))
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -87,7 +103,7 @@ def _unauthenticated_snapshot() -> dict:
 def _is_live_pilot() -> bool:
     from flask import current_app
 
-    return not current_app.config.get("DEMO_MODE") and _is_authenticated()
+    return not _agent_demo_mode() and _is_authenticated()
 
 
 def _handle_live_error(exc: LiveQueueError):
@@ -122,7 +138,7 @@ def _public_snapshot(*, jitter: bool = True) -> dict:
     """Return API state; pilot mode returns empty shell until OAuth session exists."""
     from flask import current_app
 
-    if current_app.config.get("DEMO_MODE"):
+    if _agent_demo_mode():
         snap = demo_state.snapshot(jitter=jitter)
         snap["authenticated"] = False
         snap["auth_required"] = False
@@ -135,7 +151,7 @@ def _public_snapshot(*, jitter: bool = True) -> dict:
 def _require_auth():
     from flask import current_app
 
-    if current_app.config.get("DEMO_MODE") or _is_authenticated():
+    if _agent_demo_mode() or _is_authenticated():
         return None
     return jsonify({"error": "Sign in required"}), 401
 
@@ -146,7 +162,7 @@ def index():
 
     return render_template(
         "agent_workspace/index.html",
-        demo_mode=bool(current_app.config.get("DEMO_MODE")),
+        demo_mode=_agent_demo_mode(),
     )
 
 
@@ -156,7 +172,7 @@ def reports():
 
     return render_template(
         "agent_workspace/reports.html",
-        demo_mode=bool(current_app.config.get("DEMO_MODE")),
+        demo_mode=_agent_demo_mode(),
         genesys_analytics_url=genesys_analytics_dashboards_url(),
     )
 
@@ -165,7 +181,7 @@ def reports():
 def reports_aht_trend():
     from flask import current_app
 
-    prefer_live = not bool(current_app.config.get("DEMO_MODE"))
+    prefer_live = not _agent_demo_mode()
     html = aht_trend_report_html(prefer_live=prefer_live)
     return Response(html, mimetype="text/html; charset=utf-8")
 
@@ -177,7 +193,8 @@ def health():
     return jsonify({
         "ok": True,
         "app": "GenesysToolkit",
-        "demo_mode": bool(current_app.config.get("DEMO_MODE")),
+        "demo_mode": _agent_demo_mode(),
+        "agent_demo_mode": _agent_demo_mode(),
         "authenticated": _is_authenticated(),
         "service": "agent-workspace",
     })
@@ -190,7 +207,7 @@ def oauth_login():
     oauth_for = (request.args.get("for") or "").strip().lower()
     popup = bool(request.args.get("popup"))
 
-    if current_app.config.get("DEMO_MODE") and oauth_for not in ("site-picker", "queue-performance"):
+    if _agent_demo_mode() and oauth_for not in ("site-picker", "queue-performance"):
         return render_template(
             "agent_workspace/oauth_error.html",
             demo_mode=True,
@@ -200,6 +217,8 @@ def oauth_login():
 
     if oauth_for == "site-picker":
         session["oauth_for"] = "site-picker"
+    elif oauth_for in ("", "agent", "agent-workspace"):
+        session["oauth_for"] = "agent"
     elif oauth_for == "queue-performance":
         session["oauth_for"] = "queue-performance"
         next_url = (
@@ -239,7 +258,7 @@ def oauth_callback():
     from core.cli import create_client, tool_log
 
     oauth_for = session.get("oauth_for")
-    if current_app.config.get("DEMO_MODE") and oauth_for not in ("site-picker", "queue-performance"):
+    if _agent_demo_mode() and oauth_for not in ("site-picker", "queue-performance"):
         return redirect(url_for("agent.index"))
 
     popup = oauth_for == "site-picker"
@@ -307,7 +326,7 @@ def oauth_callback():
                 return (
                     render_template(
                         "ops/queue_performance_denied.html",
-                        demo_mode=bool(current_app.config.get("DEMO_MODE")),
+                        demo_mode=_ops_demo_mode(),
                         user_name=user.display_name,
                         user_roles=[],
                         required_roles=sorted(allowed_role_names()),
@@ -320,7 +339,7 @@ def oauth_callback():
                 return (
                     render_template(
                         "ops/queue_performance_denied.html",
-                        demo_mode=bool(current_app.config.get("DEMO_MODE")),
+                        demo_mode=_ops_demo_mode(),
                         user_name=user.display_name,
                         user_roles=role_names,
                         required_roles=sorted(allowed_role_names()),
@@ -352,7 +371,7 @@ def oauth_config():
     """Read-only OAuth wiring check (no secrets) for pilot troubleshooting."""
     from flask import current_app
 
-    if current_app.config.get("DEMO_MODE"):
+    if _agent_demo_mode():
         return jsonify({"demo_mode": True, "message": "Demo mode — OAuth not used."})
     try:
         settings = agent_oauth_settings()
@@ -538,6 +557,8 @@ def create_app(*, demo_mode: bool = False):
 
     from flask import Flask
 
+    from core.app_modes import apply_split_demo_config
+
     if demo_mode:
         os.environ["AGENT_DEMO_MODE"] = "1"
     elif "AGENT_DEMO_MODE" not in os.environ:
@@ -548,8 +569,12 @@ def create_app(*, demo_mode: bool = False):
         template_folder=str(PROJECT_ROOT / "templates"),
         static_folder=str(PROJECT_ROOT / "static"),
     )
-    app.config["DEMO_MODE"] = demo_mode or os.environ.get("AGENT_DEMO_MODE") == "1"
-    if app.config["DEMO_MODE"]:
+    apply_split_demo_config(app, ops_demo=False)
+    if demo_mode:
+        app.config["AGENT_DEMO_MODE"] = True
+        app.config["DEMO_MODE"] = True
+    agent_demo = bool(app.config["AGENT_DEMO_MODE"])
+    if agent_demo:
         app.config["TEMPLATES_AUTO_RELOAD"] = True
     app.secret_key = os.environ.get(
         "FLASK_SECRET_KEY",
@@ -558,6 +583,7 @@ def create_app(*, demo_mode: bool = False):
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_SECURE"] = not app.config["DEMO_MODE"]
+    on_render = os.environ.get("RENDER") == "true"
+    app.config["SESSION_COOKIE_SECURE"] = on_render or os.environ.get("FLASK_SECURE_COOKIES") == "1"
     app.register_blueprint(agent_bp)
     return app

@@ -14,6 +14,7 @@ from app.tool_catalog import get_tool, tools_by_category
 from app.tool_runner import stream_tool_run
 from core.cli import create_client, tool_log
 from core.config import agent_credentials_present, credentials_env_probe, credential_source, missing_admin_credentials_message, client_credentials_present
+from core.app_modes import apply_split_demo_config
 from core.demo_mode import is_demo_mode
 from core.genesys_client import safe_str
 from core.paths import OUTPUTS_DIR, PROJECT_ROOT, ensure_runtime_dirs
@@ -23,6 +24,9 @@ ops_bp = Blueprint("ops", __name__)
 
 def _demo_mode() -> bool:
     from flask import current_app
+
+    if "OPS_DEMO_MODE" in current_app.config:
+        return bool(current_app.config.get("OPS_DEMO_MODE"))
     return bool(current_app.config.get("DEMO_MODE")) or is_demo_mode()
 
 
@@ -235,6 +239,8 @@ def health():
             "app": "GenesysToolkit",
             "service": "ops-console",
             "demo_mode": _demo_mode(),
+            "ops_demo_mode": _demo_mode(),
+            "agent_demo_mode": bool(current_app.config.get("AGENT_DEMO_MODE")),
             "organization": org.get("name"),
             "region": client.region,
             "api_host": client.api_host,
@@ -370,7 +376,7 @@ def create_app(*, demo_mode: bool = False):
         template_folder=str(PROJECT_ROOT / "templates"),
         static_folder=str(PROJECT_ROOT / "static"),
     )
-    app.config["DEMO_MODE"] = demo_mode or is_demo_mode()
+    apply_split_demo_config(app, ops_demo=demo_mode or is_demo_mode())
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "genesys-toolkit-demo" if demo_mode else "genesys-toolkit-local")
     on_render = os.environ.get("RENDER") == "true"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
