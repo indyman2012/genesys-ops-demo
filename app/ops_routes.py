@@ -177,7 +177,14 @@ def not_responding_api():
 
 @ops_bp.route("/health")
 def health():
+    from flask import current_app
+
     probe = credentials_env_probe()
+    corporate_routes = sorted(
+        rule.rule
+        for rule in current_app.url_map.iter_rules()
+        if "corporate-training" in rule.rule
+    )
     try:
         client = create_client(log=tool_log)
         org = client.request("GET", "/api/v2/organizations/me")
@@ -193,6 +200,7 @@ def health():
             "credential_source": credential_source(),
             "admin_credentials_set": probe.get("GENESYS_CLIENT_ID") and probe.get("GENESYS_CLIENT_SECRET"),
             "agent_credentials_set": agent_credentials_present(),
+            "corporate_training_routes": corporate_routes,
         })
     except Exception as exc:
         return jsonify({
@@ -331,5 +339,5 @@ def create_app(*, demo_mode: bool = False):
     from app.corporate_training import corporate_training_bp
 
     app.register_blueprint(ask_bp)
-    app.register_blueprint(corporate_training_bp, url_prefix="/corporate-training")
+    app.register_blueprint(corporate_training_bp)
     return app
