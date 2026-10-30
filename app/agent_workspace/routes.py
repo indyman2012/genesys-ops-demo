@@ -35,9 +35,14 @@ agent_bp = Blueprint("agent", __name__, url_prefix="/agent")
 def _agent_demo_mode() -> bool:
     from flask import current_app
 
+    from core.app_modes import agent_demo_from_env, coerce_bool
+
     if "AGENT_DEMO_MODE" in current_app.config:
-        return bool(current_app.config.get("AGENT_DEMO_MODE"))
-    return bool(current_app.config.get("DEMO_MODE"))
+        return coerce_bool(current_app.config.get("AGENT_DEMO_MODE"))
+    parsed = agent_demo_from_env()
+    if parsed is not None:
+        return parsed
+    return coerce_bool(current_app.config.get("DEMO_MODE"))
 
 
 def _ops_demo_mode() -> bool:
@@ -190,11 +195,12 @@ def reports_aht_trend():
 def health():
     from flask import current_app
 
+    from core.app_modes import demo_mode_health_payload
+
     return jsonify({
         "ok": True,
         "app": "GenesysToolkit",
-        "demo_mode": _agent_demo_mode(),
-        "agent_demo_mode": _agent_demo_mode(),
+        **demo_mode_health_payload(current_app),
         "authenticated": _is_authenticated(),
         "service": "agent-workspace",
     })

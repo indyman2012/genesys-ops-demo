@@ -14,7 +14,7 @@ from app.tool_catalog import get_tool, tools_by_category
 from app.tool_runner import stream_tool_run
 from core.cli import create_client, tool_log
 from core.config import agent_credentials_present, credentials_env_probe, credential_source, missing_admin_credentials_message, client_credentials_present
-from core.app_modes import apply_split_demo_config
+from core.app_modes import apply_split_demo_config, demo_mode_health_payload
 from core.demo_mode import is_demo_mode
 from core.genesys_client import safe_str
 from core.paths import OUTPUTS_DIR, PROJECT_ROOT, ensure_runtime_dirs
@@ -238,9 +238,7 @@ def health():
             "ok": True,
             "app": "GenesysToolkit",
             "service": "ops-console",
-            "demo_mode": _demo_mode(),
-            "ops_demo_mode": _demo_mode(),
-            "agent_demo_mode": bool(current_app.config.get("AGENT_DEMO_MODE")),
+            **demo_mode_health_payload(current_app),
             "organization": org.get("name"),
             "region": client.region,
             "api_host": client.api_host,
@@ -377,6 +375,9 @@ def create_app(*, demo_mode: bool = False):
         static_folder=str(PROJECT_ROOT / "static"),
     )
     apply_split_demo_config(app, ops_demo=demo_mode or is_demo_mode())
+    if demo_mode:
+        app.config["OPS_DEMO_MODE"] = True
+        app.config["DEMO_MODE"] = True
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "genesys-toolkit-demo" if demo_mode else "genesys-toolkit-local")
     on_render = os.environ.get("RENDER") == "true"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
