@@ -266,6 +266,24 @@ def not_responding_api():
         return jsonify({"error": str(exc)}), 500
 
 
+@ops_bp.route("/health/live")
+def health_live():
+    """Fast liveness for Render deploy health checks (no Genesys API call)."""
+    from flask import current_app
+
+    from core.app_modes import demo_mode_health_payload
+
+    return jsonify(
+        {
+            "ok": True,
+            "app": "GenesysToolkit",
+            "service": "ops-console",
+            "live": True,
+            **demo_mode_health_payload(current_app),
+        }
+    )
+
+
 @ops_bp.route("/health")
 def health():
     from flask import current_app

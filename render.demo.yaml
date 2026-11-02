@@ -5,6 +5,8 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn genesys_toolkit_app:app --bind 0.0.0.0:$PORT --timeout 600
+    # Dashboard: set Health Check Path to /health/live (avoids Genesys call on every deploy probe).
+    healthCheckPath: /health/live
     envVars:
       - key: OPS_DEMO_MODE
         value: "1"
