@@ -5,6 +5,7 @@ from openpyxl import Workbook
 
 from core.datatables import build_call_manager_row_body, find_row_by_dnis, schema_property_key
 from tools.queues.ncm_call_manager_sync_lib import (
+    build_roster_template_xlsx,
     parse_ncm_roster_workbook,
     resolve_patient_services_center_queue,
 )
@@ -19,6 +20,13 @@ class NcmCallManagerSyncTests(unittest.TestCase):
         buf = BytesIO()
         wb.save(buf)
         return buf.getvalue()
+
+    def test_roster_template_xlsx(self):
+        data = build_roster_template_xlsx()
+        self.assertTrue(data[:2] == b"PK")
+        rows = parse_ncm_roster_workbook(data)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["queue_name"], "NCM_BHM_Roebuck")
 
     def test_parse_roster_workbook(self):
         data = self._workbook_bytes(

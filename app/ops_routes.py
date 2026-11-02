@@ -116,6 +116,13 @@ def call_manager_sync_asset(filename: str):
     return send_from_directory(_CALL_MANAGER_SYNC_STATIC, filename)
 
 
+@ops_bp.route("/call-manager-sync/api/template")
+def call_manager_sync_template():
+    from app.call_manager_sync.routes import template_download
+
+    return template_download()
+
+
 @ops_bp.route("/call-manager-sync/api/setup")
 def call_manager_sync_setup():
     from flask import jsonify

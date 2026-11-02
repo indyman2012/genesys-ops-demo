@@ -5,7 +5,7 @@ import re
 from io import BytesIO
 from typing import Any, BinaryIO
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 from core.datatables import (
     build_call_manager_row_body,
@@ -30,6 +30,24 @@ from tools.telephony.web_station_helpers import (
 )
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+ROSTER_TEMPLATE_HEADERS = ("Email Address", "Queue Name", "Phone Number")
+ROSTER_TEMPLATE_FILENAME = "ncm_call_manager_roster_template.xlsx"
+
+
+def build_roster_template_xlsx() -> bytes:
+    """Three-column roster template with header row and one example row."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Roster"
+    ws.append(list(ROSTER_TEMPLATE_HEADERS))
+    ws.append(["agent@example.com", "NCM_BHM_Roebuck", "2055551212"])
+    for col, width in zip("ABC", (36, 32, 18)):
+        ws.column_dimensions[col].width = width
+    buf = BytesIO()
+    wb.save(buf)
+    wb.close()
+    return buf.getvalue()
 
 RESULT_FIELDS = [
     "input_email",

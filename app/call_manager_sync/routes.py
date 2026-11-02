@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import jsonify, request
+from flask import Response, jsonify, request
 
 from app.ops_auth import require_queue_performance_access
 from core.cli import create_client, tool_log
@@ -27,6 +27,23 @@ def _parse_upload() -> tuple[list[dict[str, str]] | None, Any]:
     if not rows:
         return None, (jsonify({"error": "No roster rows found (Email, Queue Name, Phone Number)"}), 400)
     return rows, None
+
+
+def template_download():
+    from tools.queues.ncm_call_manager_sync_lib import (
+        ROSTER_TEMPLATE_FILENAME,
+        build_roster_template_xlsx,
+    )
+
+    data = build_roster_template_xlsx()
+    return Response(
+        data,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{ROSTER_TEMPLATE_FILENAME}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 def setup_api():
