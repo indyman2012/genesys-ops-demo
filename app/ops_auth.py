@@ -104,6 +104,8 @@ def _oauth_return_path() -> str:
     path = request.path or ""
     if path.startswith("/corporate-training") or "/corporate-training/" in path:
         return "/corporate-training/"
+    if path.startswith("/call-manager-sync") or "/call-manager-sync/" in path:
+        return "/call-manager-sync/"
     next_url = request.full_path if request.query_string else path
     if next_url.endswith("?"):
         next_url = next_url[:-1]
@@ -118,6 +120,11 @@ def _queue_performance_login_url(*, return_to: str | None = None) -> str:
         return url_for(
             "agent.oauth_login",
             **{"for": "queue-performance", "next": "/corporate-training/"},
+        )
+    if target.startswith("/call-manager-sync"):
+        return url_for(
+            "agent.oauth_login",
+            **{"for": "queue-performance", "next": "/call-manager-sync/"},
         )
     if target != "/queue-performance":
         return url_for(

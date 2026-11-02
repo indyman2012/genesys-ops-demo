@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NCM Call Manager Roster Sync</title>
+  <link rel="stylesheet" href="/call-manager-sync/assets/sync.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <h1>NCM Call Manager Roster Sync</h1>
+        <p class="sub">
+          Upload Excel with <strong>Email Address</strong>, <strong>Queue Name</strong>, and
+          <strong>Phone Number</strong>. Each row verifies queue membership (joined),
+          station/WebRTC phone, and the <em>Call Managers</em> data table DNIS row.
+        </p>
+      </header>
+      <div class="body">
+        <div id="auth-banner" class="banner info" style="display:none"></div>
+        <div id="setup-info" class="queue-list"></div>
+
+        <section class="workflow">
+          <h2>Roster sync</h2>
+          <p class="help">
+            Preview shows planned changes. Apply runs live updates using server credentials
+            (queue membership, optional WebRTC phone at Headquarters, new data table rows).
+          </p>
+          <div class="row">
+            <input type="file" id="file-sync" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <button type="button" class="secondary" id="btn-sync-preview">Preview</button>
+            <button type="button" class="primary" id="btn-sync-apply" disabled>Apply changes</button>
+          </div>
+          <div id="result-sync" class="result"></div>
+        </section>
+
+        <details>
+          <summary>Data table row fields (new rows)</summary>
+          <div class="inner">
+            <ul>
+              <li><strong>DNIS</strong> — phone from spreadsheet (E.164)</li>
+              <li><strong>QueueName</strong> — queue from spreadsheet</li>
+              <li><strong>Skill</strong> — NCM</li>
+              <li><strong>CenterQueue</strong> — matching Patient Services queue (from NCM queue suffix)</li>
+              <li><strong>Open</strong> — true</li>
+            </ul>
+            <p>Override table name with env <code>CALL_MANAGERS_DATATABLE_NAME</code> (default Call Managers).</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Hosting &amp; sign-in</summary>
+          <div class="inner">
+            <p>Open at <code>/call-manager-sync/</code> on your GenesysCloudToolkit ops site.</p>
+            <p>Sign in with a Genesys supervisor/admin account when prompted.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+  <script src="/call-manager-sync/assets/sync.js"></script>
+</body>
+</html>

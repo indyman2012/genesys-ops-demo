@@ -102,6 +102,34 @@ def corporate_training_assign():
     return assign_training_queue_api()
 
 
+_CALL_MANAGER_SYNC_STATIC = PROJECT_ROOT / "static" / "call_manager_sync"
+
+
+@ops_bp.route("/call-manager-sync")
+@ops_bp.route("/call-manager-sync/")
+def call_manager_sync_page():
+    return send_from_directory(_CALL_MANAGER_SYNC_STATIC, "index.html")
+
+
+@ops_bp.route("/call-manager-sync/assets/<path:filename>")
+def call_manager_sync_asset(filename: str):
+    return send_from_directory(_CALL_MANAGER_SYNC_STATIC, filename)
+
+
+@ops_bp.route("/call-manager-sync/api/setup")
+def call_manager_sync_setup():
+    from app.call_manager_sync.routes import setup_api
+
+    return setup_api()
+
+
+@ops_bp.route("/call-manager-sync/api/sync", methods=["POST"])
+def call_manager_sync_run():
+    from app.call_manager_sync.routes import sync_api
+
+    return sync_api()
+
+
 @ops_bp.route("/queue-performance/logout")
 def queue_performance_logout():
     from app.agent_workspace.oauth import clear_session
