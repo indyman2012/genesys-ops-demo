@@ -118,16 +118,26 @@ def call_manager_sync_asset(filename: str):
 
 @ops_bp.route("/call-manager-sync/api/setup")
 def call_manager_sync_setup():
-    from app.call_manager_sync.routes import setup_api
+    from flask import jsonify
 
-    return setup_api()
+    try:
+        from app.call_manager_sync.routes import setup_api
+
+        return setup_api()
+    except Exception as exc:
+        return jsonify({"error": f"call-manager-sync setup failed: {exc}"}), 500
 
 
 @ops_bp.route("/call-manager-sync/api/sync", methods=["POST"])
 def call_manager_sync_run():
-    from app.call_manager_sync.routes import sync_api
+    from flask import jsonify
 
-    return sync_api()
+    try:
+        from app.call_manager_sync.routes import sync_api
+
+        return sync_api()
+    except Exception as exc:
+        return jsonify({"error": f"call-manager-sync sync failed: {exc}"}), 500
 
 
 @ops_bp.route("/queue-performance/logout")
