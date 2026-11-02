@@ -8,7 +8,6 @@ from app.ops_auth import require_queue_performance_access
 from core.cli import create_client, tool_log
 from core.datatables import datatable_name_from_env, find_datatable_by_name
 from core.genesys_client import GenesysError
-from tools.queues.ncm_call_manager_sync_lib import parse_ncm_roster_workbook, run_ncm_call_manager_sync
 
 
 def _auth_block():
@@ -19,6 +18,8 @@ def _parse_upload() -> tuple[list[dict[str, str]] | None, Any]:
     upload = request.files.get("file")
     if not upload or not upload.filename:
         return None, (jsonify({"error": "Upload an Excel file (.xlsx)"}), 400)
+    from tools.queues.ncm_call_manager_sync_lib import parse_ncm_roster_workbook
+
     try:
         rows = parse_ncm_roster_workbook(upload.stream)
     except Exception as exc:
@@ -58,6 +59,8 @@ def sync_api():
         return err
     apply = request.form.get("apply") == "1"
     try:
+        from tools.queues.ncm_call_manager_sync_lib import run_ncm_call_manager_sync
+
         client = create_client(log=tool_log)
         payload = run_ncm_call_manager_sync(client, roster, apply=apply)
         return jsonify(payload)

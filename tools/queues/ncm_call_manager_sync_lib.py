@@ -20,12 +20,14 @@ from core.datatables import (
 from core.genesys_client import GenesysClient, GenesysError, ensure_e164, find_by_name, safe_str
 from core.lookups import find_user_by_email, user_is_queue_member
 from tools.telephony.reassign_hq_phones_by_active_queue import DEFAULT_HQ_SITE, queue_parts
-from tools.telephony.rn_telephony_prep import (
+from tools.telephony.web_station_helpers import (
     create_web_phone,
     find_web_phone,
     get_phone_base_settings,
+    index_phones_by_user,
+    load_phones,
+    resolve_site_by_name,
 )
-from tools.users_roles.medical_assistant_telephony_align import index_phones, load_phones
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -252,10 +254,7 @@ def _index_stations_by_user(client: GenesysClient) -> dict[str, dict]:
 
 def _load_telephony_cache(client: GenesysClient) -> dict[str, Any]:
     try:
-        hq_site = find_by_name(
-            client.paged_get("/api/v2/telephony/providers/edges/sites"),
-            DEFAULT_HQ_SITE,
-        )
+        hq_site = resolve_site_by_name(client, DEFAULT_HQ_SITE)
         if not hq_site:
             return {"ready": False, "error": f"Site not found: {DEFAULT_HQ_SITE}"}
         phone_base, line_base = get_phone_base_settings(client)
@@ -289,7 +288,7 @@ def run_ncm_call_manager_sync(
     datatable_rows = list_datatable_rows(client, table_id)
     stations_by_user = _index_stations_by_user(client)
     phones = load_phones(client)
-    phones_by_user, phones_by_name = index_phones(phones)
+    phones_by_user, phones_by_name = index_phones_by_user(phones)
     telephony_cache = _load_telephony_cache(client)
 
     stats = {

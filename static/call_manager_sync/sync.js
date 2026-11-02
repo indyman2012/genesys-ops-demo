@@ -92,10 +92,15 @@
       try {
         return { ok: res.ok, body: JSON.parse(text), status: res.status };
       } catch (_e) {
+        var snippet = (text || "").replace(/\s+/g, " ").trim().slice(0, 200);
+        var hint =
+          res.status === 401
+            ? "Sign in required"
+            : "Unexpected server response (HTTP " + res.status + "). " + snippet;
         return {
           ok: false,
           status: res.status,
-          body: { error: res.status === 401 ? "Sign in required" : "Unexpected server response" },
+          body: { error: hint },
         };
       }
     });
