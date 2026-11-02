@@ -30,12 +30,28 @@ def _parse_upload() -> tuple[list[dict[str, str]] | None, Any]:
 
 
 def template_download():
+    """Fallback: dynamic template (primary download is static assets/*.xlsx)."""
+    from flask import send_from_directory
+
+    from core.paths import PROJECT_ROOT
     from tools.queues.ncm_call_manager_sync_lib import (
         ROSTER_TEMPLATE_FILENAME,
         build_roster_template_xlsx,
     )
 
-    data = build_roster_template_xlsx()
+    static_path = PROJECT_ROOT / "static" / "call_manager_sync" / ROSTER_TEMPLATE_FILENAME
+    if static_path.is_file():
+        return send_from_directory(
+            static_path.parent,
+            static_path.name,
+            as_attachment=True,
+            download_name=ROSTER_TEMPLATE_FILENAME,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    try:
+        data = build_roster_template_xlsx()
+    except Exception as exc:
+        return jsonify({"error": f"Could not build template: {exc}"}), 500
     return Response(
         data,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

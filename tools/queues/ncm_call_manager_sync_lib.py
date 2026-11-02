@@ -46,7 +46,6 @@ def build_roster_template_xlsx() -> bytes:
         ws.column_dimensions[col].width = width
     buf = BytesIO()
     wb.save(buf)
-    wb.close()
     return buf.getvalue()
 
 RESULT_FIELDS = [
