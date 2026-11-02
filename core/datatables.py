@@ -8,7 +8,11 @@ from core.genesys_client import GenesysClient, GenesysError, ensure_e164, find_b
 
 
 def datatable_name_from_env() -> str:
-    return (os.environ.get("CALL_MANAGERS_DATATABLE_NAME") or "Call Managers").strip()
+    return (
+        os.environ.get("CALL_MANAGERS_DATATABLE_NAME")
+        or os.environ.get("CARE_MANAGERS_LOOKUP_DATATABLE_NAME")
+        or "Care Managers Lookup"
+    ).strip()
 
 
 def find_datatable_by_name(client: GenesysClient, name: str) -> dict[str, Any]:

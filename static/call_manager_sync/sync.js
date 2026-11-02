@@ -159,7 +159,7 @@
         if (pack.status === 401 && pack.body.login_url) {
           showBanner(
             "info",
-            "Sign in to verify Call Managers data table access. <a href=\"" +
+            "Sign in to verify Care Managers Lookup data table access. <a href=\"" +
               escapeHtml(pack.body.login_url) +
               "\">Sign in with Genesys</a>"
           );

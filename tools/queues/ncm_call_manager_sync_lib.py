@@ -1,4 +1,4 @@
-"""NCM roster sync: queue membership, station, Call Managers data table."""
+"""NCM roster sync: queue membership, station, Care Managers Lookup data table."""
 from __future__ import annotations
 
 import re
