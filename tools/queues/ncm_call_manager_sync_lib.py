@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import time
 from io import BytesIO
 from typing import Any, BinaryIO
 
@@ -11,21 +12,17 @@ from core.datatables import (
     build_call_manager_row_body,
     create_datatable_row,
     datatable_name_from_env,
+    datatable_row_by_key,
     find_datatable_by_name,
-    find_row_by_dnis,
-    list_datatable_rows,
     load_datatable_with_schema,
     schema_property_key,
 )
 from core.genesys_client import GenesysClient, GenesysError, ensure_e164, find_by_name, safe_str
-from core.lookups import find_user_by_email, user_is_queue_member
+from core.lookups import find_users_by_email_search
 from tools.telephony.reassign_hq_phones_by_active_queue import DEFAULT_HQ_SITE, queue_parts
 from tools.telephony.web_station_helpers import (
     create_web_phone,
-    find_web_phone,
     get_phone_base_settings,
-    index_phones_by_user,
-    load_phones,
     resolve_site_by_name,
 )
 
@@ -158,22 +155,45 @@ def resolve_patient_services_center_queue(
     )
 
 
-def _user_has_station(
-    client: GenesysClient,
-    user_id: str,
-    *,
-    phones_by_user: dict[str, dict],
-    phones_by_name: dict[str, list[dict]],
-    stations_by_user: dict[str, dict],
-    user_name: str,
-) -> tuple[bool, str]:
-    if user_id in stations_by_user:
-        st = stations_by_user[user_id]
-        return True, safe_str(st.get("name")) or "station"
-    web = find_web_phone(client, user_id, user_name, phones_by_user, phones_by_name)
-    if web:
-        return True, safe_str(web.get("name")) or "web phone"
-    return False, ""
+def _pick_user(matches: list[dict[str, Any]]) -> dict[str, Any]:
+    active = [u for u in matches if safe_str(u.get("state")).upper() == "ACTIVE"]
+    if len(active) == 1:
+        return active[0]
+    if len(matches) == 1:
+        return matches[0]
+    raise GenesysError(f"Multiple users matched: {[u.get('name') for u in matches]}")
+
+
+def prefetch_users_by_email(client: GenesysClient, emails: set[str]) -> dict[str, dict[str, Any]]:
+    """Search API only — never scans the full user directory."""
+    out: dict[str, dict[str, Any]] = {}
+    for email in sorted(emails):
+        matches = find_users_by_email_search(client, email)
+        if matches:
+            out[email] = _pick_user(matches)
+    return out
+
+
+def build_queue_name_index(queues: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    index: dict[str, dict[str, Any]] = {}
+    for queue in queues:
+        name = safe_str(queue.get("name"))
+        if name:
+            index[name.casefold()] = queue
+    return index
+
+
+def _load_user_queues(client: GenesysClient, user_id: str, cache: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    if user_id not in cache:
+        cache[user_id] = client.paged_get(f"/api/v2/users/{user_id}/queues")
+    return cache[user_id]
+
+
+def _queue_membership(user_queues: list[dict[str, Any]], queue_id: str) -> dict[str, Any] | None:
+    for row in user_queues:
+        if safe_str(row.get("id")) == queue_id:
+            return row
+    return None
 
 
 def _ensure_queue_joined(
@@ -181,12 +201,13 @@ def _ensure_queue_joined(
     *,
     user_id: str,
     queue: dict[str, Any],
+    user_queues: list[dict[str, Any]],
     apply: bool,
 ) -> list[str]:
     queue_id = safe_str(queue.get("id"))
     queue_name = safe_str(queue.get("name"))
     actions: list[str] = []
-    member = user_is_queue_member(client, queue_id, user_id)
+    member = _queue_membership(user_queues, queue_id)
     if member:
         if member.get("joined"):
             actions.append(f"queue ok: joined on {queue_name}")
@@ -197,6 +218,7 @@ def _ensure_queue_joined(
                 f"/api/v2/users/{user_id}/queues/{queue_id}",
                 json_body={"joined": True},
             )
+            member["joined"] = True
             actions.append(f"set joined=true on {queue_name}")
         else:
             actions.append(f"would set joined=true on {queue_name}")
@@ -214,48 +236,11 @@ def _ensure_queue_joined(
             f"/api/v2/users/{user_id}/queues/{queue_id}",
             json_body={"joined": True},
         )
+        user_queues.append({"id": queue_id, "name": queue_name, "joined": True})
         actions.append(f"added member + joined=true on {queue_name}")
     else:
         actions.append(f"would add to {queue_name} with joined=true")
     return actions
-
-
-def _ensure_station(
-    client: GenesysClient,
-    user: dict[str, Any],
-    *,
-    apply: bool,
-    phones_by_user: dict[str, dict],
-    phones_by_name: dict[str, list[dict]],
-    stations_by_user: dict[str, dict],
-    telephony_cache: dict[str, Any],
-) -> tuple[list[str], str]:
-    uid = safe_str(user.get("id"))
-    name = safe_str(user.get("name"))
-    has, label = _user_has_station(
-        client,
-        uid,
-        phones_by_user=phones_by_user,
-        phones_by_name=phones_by_name,
-        stations_by_user=stations_by_user,
-        user_name=name,
-    )
-    if has:
-        return [f"station ok: {label}"], ""
-
-    if not apply:
-        return ["would ensure station (WebRTC phone at Headquarters if missing)"], "no station"
-
-    if not telephony_cache.get("ready"):
-        return [], telephony_cache.get("error") or "telephony prerequisites not loaded"
-
-    site = telephony_cache["hq_site"]
-    phone_base = telephony_cache["phone_base"]
-    line_base = telephony_cache["line_base"]
-    _created, note = create_web_phone(client, user, site, phone_base, line_base, apply=True)
-    if note.startswith("web_phone_error"):
-        return [], note.replace("web_phone_error:", "", 1)
-    return [note], ""
 
 
 def _index_stations_by_user(client: GenesysClient) -> dict[str, dict]:
@@ -267,6 +252,32 @@ def _index_stations_by_user(client: GenesysClient) -> dict[str, dict]:
         if uid:
             by_user[uid] = station
     return by_user
+
+
+def _user_has_web_phone(client: GenesysClient, user_id: str) -> bool:
+    payload = client.request(
+        "GET",
+        "/api/v2/telephony/providers/edges/phones",
+        params={"webRtcUser.id": user_id, "pageSize": 1, "pageNumber": 1},
+    )
+    return bool((payload or {}).get("entities"))
+
+
+def _user_has_station(
+    client: GenesysClient,
+    user_id: str,
+    *,
+    stations_by_user: dict[str, dict],
+    web_phone_cache: dict[str, bool],
+) -> tuple[bool, str]:
+    if user_id in stations_by_user:
+        st = stations_by_user[user_id]
+        return True, safe_str(st.get("name")) or "station"
+    if user_id not in web_phone_cache:
+        web_phone_cache[user_id] = _user_has_web_phone(client, user_id)
+    if web_phone_cache[user_id]:
+        return True, "WebRTC phone"
+    return False, ""
 
 
 def _load_telephony_cache(client: GenesysClient) -> dict[str, Any]:
@@ -287,6 +298,55 @@ def _load_telephony_cache(client: GenesysClient) -> dict[str, Any]:
         return {"ready": False, "error": str(exc)}
 
 
+def _ensure_station(
+    client: GenesysClient,
+    user: dict[str, Any],
+    *,
+    apply: bool,
+    stations_by_user: dict[str, dict],
+    web_phone_cache: dict[str, bool],
+    telephony_cache: dict[str, Any] | None,
+) -> tuple[list[str], str]:
+    uid = safe_str(user.get("id"))
+    has, label = _user_has_station(
+        client, uid, stations_by_user=stations_by_user, web_phone_cache=web_phone_cache
+    )
+    if has:
+        return [f"station ok: {label}"], ""
+
+    if not apply:
+        return ["would ensure station (WebRTC phone at Headquarters if missing)"], ""
+
+    if not telephony_cache or not telephony_cache.get("ready"):
+        return [], (telephony_cache or {}).get("error") or "telephony prerequisites not loaded"
+
+    _created, note = create_web_phone(
+        client,
+        user,
+        telephony_cache["hq_site"],
+        telephony_cache["phone_base"],
+        telephony_cache["line_base"],
+        apply=True,
+    )
+    if note.startswith("web_phone_error"):
+        return [], note.replace("web_phone_error:", "", 1)
+    web_phone_cache[uid] = True
+    return [note], ""
+
+
+def _dnis_exists(
+    client: GenesysClient,
+    table_id: str,
+    dnis: str,
+    cache: dict[str, bool],
+) -> bool:
+    if dnis in cache:
+        return cache[dnis]
+    exists = datatable_row_by_key(client, table_id, dnis) is not None
+    cache[dnis] = exists
+    return exists
+
+
 def run_ncm_call_manager_sync(
     client: GenesysClient,
     roster_rows: list[dict[str, str]],
@@ -294,19 +354,28 @@ def run_ncm_call_manager_sync(
     apply: bool,
     datatable_name: str | None = None,
 ) -> dict[str, Any]:
+    started = time.monotonic()
     datatable_name = datatable_name or datatable_name_from_env()
     table_meta = find_datatable_by_name(client, datatable_name)
     table_id = safe_str(table_meta.get("id"))
     table_doc = load_datatable_with_schema(client, table_id)
     schema = table_doc.get("schema") or {}
-    dnis_field = schema_property_key(schema, "dnis", "key")
 
     all_queues = client.paged_get("/api/v2/routing/queues")
-    datatable_rows = list_datatable_rows(client, table_id)
+    queue_index = build_queue_name_index(all_queues)
+    center_queue_cache: dict[str, str] = {}
+
+    valid_emails = {
+        normalize_email(item.get("email", ""))
+        for item in roster_rows
+        if normalize_email(item.get("email", "")) and EMAIL_PATTERN.match(normalize_email(item.get("email", "")))
+    }
+    users_by_email = prefetch_users_by_email(client, valid_emails)
+    user_queues_cache: dict[str, list[dict[str, Any]]] = {}
     stations_by_user = _index_stations_by_user(client)
-    phones = load_phones(client)
-    phones_by_user, phones_by_name = index_phones_by_user(phones)
-    telephony_cache = _load_telephony_cache(client)
+    web_phone_cache: dict[str, bool] = {}
+    dnis_cache: dict[str, bool] = {}
+    telephony_cache: dict[str, Any] | None = None
 
     stats = {
         "ok": 0,
@@ -357,16 +426,23 @@ def run_ncm_call_manager_sync(
             if not dnis:
                 raise GenesysError(f"Could not format phone as E.164: {phone_raw}")
 
-            user = find_user_by_email(client, email)
+            user = users_by_email.get(email)
+            if not user:
+                raise GenesysError(f"User not found: {email}")
             uid = safe_str(user.get("id"))
             base["user_id"] = uid
             base["user_name"] = safe_str(user.get("name"))
 
-            queue = find_by_name(all_queues, queue_name)
+            queue = queue_index.get(queue_name.casefold())
             if not queue:
                 raise GenesysError(f"Queue not found: {queue_name}")
+            user_queues = _load_user_queues(client, uid, user_queues_cache)
             queue_actions = _ensure_queue_joined(
-                client, user_id=uid, queue=queue, apply=apply
+                client,
+                user_id=uid,
+                queue=queue,
+                user_queues=user_queues,
+                apply=apply,
             )
             actions.extend(queue_actions)
             for act in queue_actions:
@@ -374,13 +450,18 @@ def run_ncm_call_manager_sync(
                     if "ok" not in act:
                         stats["queue_fixes"] += 1
 
+            if apply and not _user_has_station(
+                client, uid, stations_by_user=stations_by_user, web_phone_cache=web_phone_cache
+            )[0]:
+                if telephony_cache is None:
+                    telephony_cache = _load_telephony_cache(client)
+
             station_actions, station_err = _ensure_station(
                 client,
                 user,
                 apply=apply,
-                phones_by_user=phones_by_user,
-                phones_by_name=phones_by_name,
                 stations_by_user=stations_by_user,
+                web_phone_cache=web_phone_cache,
                 telephony_cache=telephony_cache,
             )
             actions.extend(station_actions)
@@ -389,11 +470,12 @@ def run_ncm_call_manager_sync(
             if any("created_web_phone" in a or "would ensure station" in a for a in station_actions):
                 stats["station_fixes"] += 1
 
-            center_queue_name = resolve_patient_services_center_queue(queue_name, all_queues)
+            if queue_name not in center_queue_cache:
+                center_queue_cache[queue_name] = resolve_patient_services_center_queue(queue_name, all_queues)
+            center_queue_name = center_queue_cache[queue_name]
             base["center_queue"] = center_queue_name
 
-            existing = find_row_by_dnis(datatable_rows, dnis, dnis_field=dnis_field)
-            if existing:
+            if _dnis_exists(client, table_id, dnis, dnis_cache):
                 base["datatable_row"] = "exists"
                 actions.append(f"datatable row exists for {dnis}")
                 stats["datatable_exists"] += 1
@@ -409,7 +491,7 @@ def run_ncm_call_manager_sync(
                 note = create_datatable_row(client, table_id, row_body, apply=apply)
                 actions.append(f"{note} DNIS={dnis}")
                 if apply:
-                    datatable_rows.append(row_body)
+                    dnis_cache[dnis] = True
                     stats["datatable_created"] += 1
                     base["datatable_row"] = "created"
                 else:
@@ -425,12 +507,14 @@ def run_ncm_call_manager_sync(
             stats["error"] += 1
             result_rows.append(base)
 
+    elapsed = round(time.monotonic() - started, 2)
     return {
         "mode": "ncm_call_manager_sync",
         "apply": apply,
         "datatable_name": datatable_name,
         "datatable_id": table_id,
         "input_count": len(roster_rows),
+        "elapsed_seconds": elapsed,
         "stats": stats,
         "rows": result_rows,
     }

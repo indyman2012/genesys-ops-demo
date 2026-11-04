@@ -113,7 +113,23 @@ def call_manager_sync_page():
 
 @ops_bp.route("/call-manager-sync/assets/<path:filename>")
 def call_manager_sync_asset(filename: str):
-    return send_from_directory(_CALL_MANAGER_SYNC_STATIC, filename)
+    mimetype = None
+    if filename.lower().endswith(".xlsx"):
+        mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return send_from_directory(_CALL_MANAGER_SYNC_STATIC, filename, mimetype=mimetype)
+
+
+@ops_bp.route("/call-manager-sync/template.xlsx")
+def call_manager_sync_template_xlsx():
+    from tools.queues.ncm_call_manager_sync_lib import ROSTER_TEMPLATE_FILENAME
+
+    return send_from_directory(
+        _CALL_MANAGER_SYNC_STATIC,
+        ROSTER_TEMPLATE_FILENAME,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=ROSTER_TEMPLATE_FILENAME,
+    )
 
 
 @ops_bp.route("/call-manager-sync/api/template")

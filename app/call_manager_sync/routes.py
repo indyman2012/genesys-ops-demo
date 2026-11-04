@@ -67,18 +67,23 @@ def setup_api():
     if blocked:
         return blocked
     name = datatable_name_from_env()
+    verify = request.args.get("verify") == "1"
+    payload: dict[str, object] = {
+        "datatable_name": name,
+        "message": "Upload Excel with Email Address, Queue Name, and Phone Number columns.",
+    }
+    if not verify:
+        payload["datatable_id"] = None
+        payload["verified"] = False
+        return jsonify(payload)
     try:
         client = create_client(log=tool_log)
         table = find_datatable_by_name(client, name)
-        return jsonify(
-            {
-                "datatable_name": name,
-                "datatable_id": table.get("id"),
-                "message": "Upload Excel with Email Address, Queue Name, and Phone Number columns.",
-            }
-        )
+        payload["datatable_id"] = table.get("id")
+        payload["verified"] = True
+        return jsonify(payload)
     except GenesysError as exc:
-        return jsonify({"error": str(exc), "datatable_name": name}), 502
+        return jsonify({"error": str(exc), "datatable_name": name, "verified": False}), 502
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 

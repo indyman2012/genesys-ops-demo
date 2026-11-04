@@ -22,14 +22,13 @@ def exact_email_matches(users: list[dict[str, Any]], email: str) -> list[dict[st
     return matches
 
 
-def find_user_by_email(gc: GenesysClient, email: str) -> dict[str, Any]:
-    """Resolve a user by exact email using search first, then paginated fallback."""
+def find_users_by_email_search(gc: GenesysClient, email: str) -> list[dict[str, Any]]:
+    """Resolve users by exact email/username search only (no full-org scan)."""
     email = email.strip()
     if not email:
-        raise GenesysError("Email is required")
+        return []
 
     candidates: dict[str, dict[str, Any]] = {}
-
     for body in (
         {"query": [{"type": "EXACT", "fields": ["email"], "value": email}], "pageSize": 25, "pageNumber": 1},
         {"query": [{"type": "EXACT", "fields": ["username"], "value": email}], "pageSize": 25, "pageNumber": 1},
@@ -42,12 +41,22 @@ def find_user_by_email(gc: GenesysClient, email: str) -> dict[str, Any]:
         except GenesysError:
             pass
 
-    if not candidates:
+    return exact_email_matches(list(candidates.values()), email)
+
+
+def find_user_by_email(gc: GenesysClient, email: str) -> dict[str, Any]:
+    """Resolve a user by exact email using search first, then paginated fallback."""
+    email = email.strip()
+    if not email:
+        raise GenesysError("Email is required")
+
+    matches = find_users_by_email_search(gc, email)
+    if not matches:
+        candidates: dict[str, dict[str, Any]] = {}
         for user in gc.paged_get("/api/v2/users", params={"state": "any"}):
             if user.get("id"):
                 candidates[user["id"]] = user
-
-    matches = exact_email_matches(list(candidates.values()), email)
+        matches = exact_email_matches(list(candidates.values()), email)
     if not matches:
         raise GenesysError(f"User not found: {email}")
 

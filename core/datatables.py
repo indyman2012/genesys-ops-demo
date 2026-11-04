@@ -53,6 +53,30 @@ def list_datatable_rows(client: GenesysClient, datatable_id: str) -> list[dict[s
     return client.paged_get(f"/api/v2/flows/datatables/{datatable_id}/rows")
 
 
+def datatable_row_by_key(
+    client: GenesysClient,
+    datatable_id: str,
+    row_key: str,
+) -> dict[str, Any] | None:
+    """Fetch one row by key (DNIS). Avoids paging the entire table."""
+    from urllib.parse import quote
+
+    key = safe_str(row_key).strip()
+    if not key:
+        return None
+    encoded = quote(key, safe="")
+    try:
+        return client.request(
+            "GET",
+            f"/api/v2/flows/datatables/{datatable_id}/rows/{encoded}",
+        )
+    except GenesysError as exc:
+        msg = str(exc).lower()
+        if "404" in msg or "not found" in msg:
+            return None
+        raise
+
+
 def find_row_by_dnis(
     rows: list[dict[str, Any]],
     dnis_e164: str,

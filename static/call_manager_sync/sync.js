@@ -56,6 +56,7 @@
       " ok, " +
       (stats.error || 0) +
       " errors" +
+      (payload.elapsed_seconds != null ? " — " + payload.elapsed_seconds + "s" : "") +
       (payload.datatable_name ? " — table: " + payload.datatable_name : "");
 
     var table = document.createElement("table");
@@ -106,6 +107,18 @@
     });
   }
 
+  function setBusy(busy, label) {
+    var preview = $("btn-sync-preview");
+    var applyBtn = $("btn-sync-apply");
+    if (preview) preview.disabled = busy;
+    if (applyBtn && !applyBtn.dataset.appliedOnce) applyBtn.disabled = busy || applyBtn.disabled;
+    var el = $("result-sync");
+    if (busy && el) {
+      el.className = "result show ok";
+      el.textContent = label || "Working… this usually takes a few seconds per row.";
+    }
+  }
+
   function postSync(apply) {
     var fileInput = $("file-sync");
     var applyBtn = $("btn-sync-apply");
@@ -117,7 +130,8 @@
     var form = new FormData();
     form.append("file", file);
     if (apply) form.append("apply", "1");
-    applyBtn.disabled = true;
+    setBusy(true, apply ? "Applying changes in Genesys…" : "Running preview…");
+    if (apply) applyBtn.disabled = true;
     return fetch(apiUrl("api/sync"), {
       method: "POST",
       body: form,
@@ -140,11 +154,13 @@
         }
         renderResult("result-sync", pack.body, false);
         if (!apply) applyBtn.disabled = false;
+        if (apply) applyBtn.dataset.appliedOnce = "1";
       })
       .catch(function (err) {
         renderResult("result-sync", { error: String(err) }, true);
       })
       .finally(function () {
+        setBusy(false);
         if (apply) applyBtn.disabled = true;
       });
   }
@@ -171,12 +187,11 @@
         }
         var el = $("setup-info");
         if (el) {
+          var idLine = pack.body.datatable_id
+            ? " <code>" + escapeHtml(pack.body.datatable_id) + "</code>"
+            : " (verified on first Preview/Apply)";
           el.innerHTML =
-            "<strong>Data table:</strong> " +
-            escapeHtml(pack.body.datatable_name) +
-            " <code>" +
-            escapeHtml(pack.body.datatable_id || "") +
-            "</code>";
+            "<strong>Data table:</strong> " + escapeHtml(pack.body.datatable_name) + idLine;
         }
       })
       .catch(function (err) {
