@@ -44,7 +44,7 @@
         <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Back to Main</a>
         {% if auth_enabled and auth_user_name %}
         <span class="auth-user">Signed in as {{ auth_user_name }}</span>
-        <a href="{{ url_for('ops.queue_performance_logout') }}" class="btn btn-secondary">Sign out</a>
+        <a href="{{ url_for('ops.hub_logout') }}" class="btn btn-secondary">Sign out</a>
         {% endif %}
         <a href="{{ url_for('ops.ops_console') }}" class="btn btn-secondary">Ops Console</a>
         <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Access denied — GenesysToolkit</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=2">
+</head>
+<body class="ops-page">
+  <div class="app-shell">
+    <section class="qp-auth-gate">
+      <div class="auth-card">
+        <h1>Access denied</h1>
+        <p>Signed in as <strong>{{ user_name }}</strong>, but this area requires <strong>{{ required_label }}</strong>.</p>
+        <ul class="role-list">
+          {% for role in required_roles %}
+          <li>{{ role }}</li>
+          {% endfor %}
+        </ul>
+        {% if user_roles %}
+        <p class="muted">Your assigned roles: {{ user_roles | join(", ") }}</p>
+        {% else %}
+        <p class="muted">No assignable roles were returned for your account.</p>
+        {% endif %}
+        {% if error_message %}
+        <p class="error-inline">{{ error_message }}</p>
+        {% endif %}
+        <div class="auth-actions">
+          <a class="btn btn-primary" href="{{ url_for('ops.index') }}">Back to Main</a>
+          <a class="btn btn-secondary" href="{{ url_for('ops.hub_logout') }}">Sign out</a>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

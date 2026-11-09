@@ -3,22 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in — Queue Performance</title>
+  <title>Sign in — GenesysToolkit</title>
+  <meta http-equiv="refresh" content="0;url={{ url_for('ops.index', signin=1, next='/queue-performance') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='ops/queue_performance.css') }}?v=2">
 </head>
 <body class="ops-page">
-  <div class="app-shell">
-    <section class="qp-auth-gate">
-      <div class="auth-card">
-        <h1>Queue Performance</h1>
-        <p>Sign in with your Genesys Cloud account. Access is limited to <strong>Supervisor</strong>, <strong>Admin</strong>, and <strong>Super Admin</strong> roles.</p>
-        <div class="auth-actions">
-          <a class="btn btn-primary" href="{{ url_for('agent.oauth_login', for='queue-performance') }}">Sign in with Genesys</a>
-          <a class="btn btn-secondary" href="{{ url_for('ops.index') }}">Back to Main</a>
-        </div>
-      </div>
-    </section>
-  </div>
+  <p style="text-align:center;padding:2rem;font-family:system-ui,sans-serif">
+    Redirecting to <a href="{{ url_for('ops.index', signin=1, next='/queue-performance') }}">main menu sign-in</a>…
+  </p>
 </body>
 </html>

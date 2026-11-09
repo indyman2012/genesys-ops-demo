@@ -15,7 +15,11 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request, send_from_directory, session
 
-from app.ops_auth import queue_performance_auth_enabled, require_queue_performance_access
+from app.ops_auth import (
+    hub_auth_enabled,
+    require_admin_access,
+    sync_hub_access,
+)
 from core.cli import create_client, tool_log, write_csv
 from core.demo_mode import is_demo_mode
 from core.paths import OUTPUTS_DIR, ensure_runtime_dirs
@@ -35,21 +39,21 @@ def _demo_mode() -> bool:
 
 def _ensure_session_roles() -> None:
     """Re-fetch Genesys roles when the session was created without them (e.g. older deploy)."""
-    from app.ops_auth import SESSION_ROLES_KEY, is_genesys_authenticated, sync_queue_performance_access
+    from app.ops_auth import SESSION_ROLES_KEY, is_genesys_authenticated
 
-    if not queue_performance_auth_enabled() or session.get(SESSION_ROLES_KEY):
+    if not hub_auth_enabled() or session.get(SESSION_ROLES_KEY):
         return
     if not is_genesys_authenticated(session):
         return
     try:
-        sync_queue_performance_access(session, create_client(log=tool_log))
+        sync_hub_access(session, create_client(log=tool_log))
     except Exception as exc:  # leave roles empty; the denial reason will say so
         tool_log("warn", f"ask-genesys role refresh failed: {exc}")
 
 
 @ask_bp.route("/ask-genesys")
 def ask_page():
-    blocked = require_queue_performance_access()
+    blocked = require_admin_access()
     if blocked:
         return blocked
     from app.ask_genesys.advanced import advanced_access
@@ -61,7 +65,7 @@ def ask_page():
     return render_template(
         "ops/ask_genesys.html",
         demo_mode=_demo_mode(),
-        auth_enabled=queue_performance_auth_enabled(),
+        auth_enabled=hub_auth_enabled(),
         auth_user_name=session.get("genesys_user_name") or "",
         examples=HELP_EXAMPLES,
         llm_on=llm_enabled(),
@@ -72,7 +76,7 @@ def ask_page():
 
 @ask_bp.route("/api/ask-genesys", methods=["POST"])
 def ask_api():
-    blocked = require_queue_performance_access()
+    blocked = require_admin_access()
     if blocked:
         return blocked
 
@@ -128,7 +132,7 @@ def _advanced_response(prompt: str, user: str):
 
 @ask_bp.route("/api/ask-genesys/csv/<filename>")
 def ask_csv(filename: str):
-    blocked = require_queue_performance_access()
+    blocked = require_admin_access()
     if blocked:
         return blocked
     if not _CSV_NAME_RE.match(filename):

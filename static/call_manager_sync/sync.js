@@ -140,10 +140,11 @@
     })
       .then(parseJsonResponse)
       .then(function (pack) {
-        if (pack.status === 401 && pack.body.login_url) {
+        if (pack.status === 401) {
+          var hub = (pack.body && (pack.body.hub_url || pack.body.login_url)) || "/";
           showBanner(
             "err",
-            "Sign in required. <a href=\"" + escapeHtml(pack.body.login_url) + "\">Sign in with Genesys</a>"
+            "Sign in on the <a href=\"" + escapeHtml(hub) + "\">main menu</a> first (Supervisor role)."
           );
           renderResult("result-sync", { error: "Sign in required." }, true);
           return;
@@ -172,12 +173,11 @@
     })
       .then(parseJsonResponse)
       .then(function (pack) {
-        if (pack.status === 401 && pack.body.login_url) {
+        if (pack.status === 401) {
+          var hub = (pack.body && (pack.body.hub_url || pack.body.login_url)) || "/";
           showBanner(
             "info",
-            "Sign in to verify Care Managers Lookup data table access. <a href=\"" +
-              escapeHtml(pack.body.login_url) +
-              "\">Sign in with Genesys</a>"
+            "Sign in on the <a href=\"" + escapeHtml(hub) + "\">main menu</a> to load setup (Supervisor role)."
           );
           return;
         }

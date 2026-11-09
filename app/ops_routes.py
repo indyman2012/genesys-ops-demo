@@ -5,8 +5,13 @@ import os
 from flask import Blueprint, Response, jsonify, render_template, request, send_from_directory
 
 from app.ops_auth import (
+    hub_auth_enabled,
+    hub_login_url,
+    is_genesys_authenticated,
     queue_performance_auth_enabled,
-    require_queue_performance_access,
+    require_admin_access,
+    require_supervision_access,
+    sync_hub_access,
 )
 from app.not_responding import fetch_not_responding_agents
 from app.queue_performance import fetch_queue_detail, fetch_queue_performance, parse_filters
@@ -33,21 +38,42 @@ def _demo_mode() -> bool:
 @ops_bp.route("/")
 def index():
     """App launcher — single front door for web UIs on this host."""
-    from flask import current_app
+    from flask import current_app, request, session
 
-    from app.web_apps_catalog import hub_sections_for_app
+    from app.web_apps_catalog import hub_locked_categories, hub_sections_for_app
 
     demo = _demo_mode()
+    if hub_auth_enabled() and is_genesys_authenticated(session):
+        try:
+            client = create_client(log=tool_log)
+            sync_hub_access(session, client)
+        except Exception:
+            pass
+
+    signin_next = (request.args.get("next") or "").strip()
+    login_url = hub_login_url(next_path=signin_next or "/")
     return render_template(
         "ops/hub.html",
-        sections=hub_sections_for_app(current_app),
+        sections=hub_sections_for_app(current_app, session),
+        locked_sections=hub_locked_categories(session),
         demo_mode=demo,
+        auth_enabled=hub_auth_enabled(),
+        auth_signed_in=is_genesys_authenticated(session),
+        auth_user_name=session.get("genesys_user_name") or "",
+        auth_supervision=bool(session.get("hub_supervision_allowed")),
+        auth_admin=bool(session.get("hub_admin_allowed")),
+        login_url=login_url,
+        signin_prompt=bool(request.args.get("signin")),
+        signin_next=signin_next,
     )
 
 
 @ops_bp.route("/ops")
 @ops_bp.route("/ops/")
 def ops_console():
+    blocked = require_admin_access()
+    if blocked:
+        return blocked
     demo = _demo_mode()
     return render_template(
         "ops/index.html",
@@ -58,12 +84,15 @@ def ops_console():
 
 @ops_bp.route("/not-responding")
 def not_responding_page():
+    blocked = require_supervision_access()
+    if blocked:
+        return blocked
     return render_template("ops/not_responding.html", demo_mode=_demo_mode())
 
 
 @ops_bp.route("/queue-performance")
 def queue_performance_page():
-    blocked = require_queue_performance_access()
+    blocked = require_supervision_access()
     if blocked:
         return blocked
     from flask import session
@@ -82,6 +111,9 @@ _CORPORATE_TRAINING_STATIC = PROJECT_ROOT / "static" / "corporate_training"
 @ops_bp.route("/corporate-training")
 @ops_bp.route("/corporate-training/")
 def corporate_training_page():
+    blocked = require_supervision_access()
+    if blocked:
+        return blocked
     return send_from_directory(_CORPORATE_TRAINING_STATIC, "index.html")
 
 
@@ -124,6 +156,9 @@ _CALL_MANAGER_SYNC_STATIC = PROJECT_ROOT / "static" / "call_manager_sync"
 @ops_bp.route("/call-manager-sync")
 @ops_bp.route("/call-manager-sync/")
 def call_manager_sync_page():
+    blocked = require_supervision_access()
+    if blocked:
+        return blocked
     return send_from_directory(_CALL_MANAGER_SYNC_STATIC, "index.html")
 
 
@@ -179,20 +214,23 @@ def call_manager_sync_run():
         return jsonify({"error": f"call-manager-sync sync failed: {exc}"}), 500
 
 
+@ops_bp.route("/hub/logout")
 @ops_bp.route("/queue-performance/logout")
-def queue_performance_logout():
+def hub_logout():
     from app.agent_workspace.oauth import clear_session
     from flask import redirect, session, url_for
 
     clear_session(session)
     session.pop("queue_performance_allowed", None)
+    session.pop("hub_supervision_allowed", None)
+    session.pop("hub_admin_allowed", None)
     session.pop("genesys_role_names", None)
-    return redirect(url_for("ops.queue_performance_page"))
+    return redirect(url_for("ops.index"))
 
 
 @ops_bp.route("/api/queue-performance")
 def queue_performance_api():
-    blocked = require_queue_performance_access()
+    blocked = require_supervision_access()
     if blocked:
         return blocked
     try:
@@ -209,7 +247,7 @@ def queue_performance_api():
 
 @ops_bp.route("/api/queue-performance/queues/<queue_id>")
 def queue_performance_detail_api(queue_id: str):
-    blocked = require_queue_performance_access()
+    blocked = require_supervision_access()
     if blocked:
         return blocked
     try:
@@ -228,7 +266,7 @@ def queue_performance_detail_api(queue_id: str):
 
 @ops_bp.route("/api/queue-performance/export.pdf")
 def queue_performance_export_pdf():
-    blocked = require_queue_performance_access()
+    blocked = require_supervision_access()
     if blocked:
         return blocked
     try:
@@ -261,7 +299,7 @@ def queue_performance_export_pdf():
 
 @ops_bp.route("/api/queue-performance/export.xlsx")
 def queue_performance_export_excel():
-    blocked = require_queue_performance_access()
+    blocked = require_supervision_access()
     if blocked:
         return blocked
     try:
@@ -291,6 +329,9 @@ def queue_performance_export_excel():
 
 @ops_bp.route("/api/not-responding")
 def not_responding_api():
+    blocked = require_supervision_access()
+    if blocked:
+        return blocked
     try:
         client = create_client(log=tool_log)
         return jsonify(fetch_not_responding_agents(client))
@@ -361,6 +402,9 @@ def health():
 
 @ops_bp.route("/api/tool/<tool_id>")
 def tool_detail(tool_id: str):
+    blocked = require_admin_access()
+    if blocked:
+        return blocked
     tool = get_tool(tool_id)
     if not tool:
         return jsonify({"error": "not found"}), 404
@@ -369,6 +413,9 @@ def tool_detail(tool_id: str):
 
 @ops_bp.route("/api/options/<option_type>")
 def api_options(option_type: str):
+    blocked = require_admin_access()
+    if blocked:
+        return blocked
     try:
         client = create_client(log=tool_log)
         if option_type == "divisions":
@@ -413,6 +460,9 @@ def api_options(option_type: str):
 
 @ops_bp.route("/download-template/<tool_id>")
 def download_template(tool_id: str):
+    blocked = require_admin_access()
+    if blocked:
+        return blocked
     tool = get_tool(tool_id)
     if not tool or not tool.get("template"):
         return jsonify({"error": "no template"}), 404
@@ -421,12 +471,18 @@ def download_template(tool_id: str):
 
 @ops_bp.route("/download-output/<path:filename>")
 def download_output(filename: str):
+    blocked = require_admin_access()
+    if blocked:
+        return blocked
     ensure_runtime_dirs()
     return send_from_directory(OUTPUTS_DIR, filename, as_attachment=True)
 
 
 @ops_bp.route("/run/<tool_id>", methods=["POST"])
 def run_tool(tool_id: str):
+    blocked = require_admin_access()
+    if blocked:
+        return blocked
     tool = get_tool(tool_id)
     if not tool:
         return Response("[ERROR] Unknown tool\n", mimetype="text/plain", status=404)

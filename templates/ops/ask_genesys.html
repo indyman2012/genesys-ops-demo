@@ -45,7 +45,7 @@
         <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>
         <a href="{{ url_for('ops.queue_performance_page') }}" class="btn btn-secondary">Queue Performance</a>
         {% if auth_enabled and auth_user_name %}
-        <a href="{{ url_for('ops.queue_performance_logout') }}" class="btn btn-secondary">Sign out ({{ auth_user_name }})</a>
+        <a href="{{ url_for('ops.hub_logout') }}" class="btn btn-secondary">Sign out ({{ auth_user_name }})</a>
         {% endif %}
       </div>
     </div>

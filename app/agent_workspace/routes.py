@@ -213,7 +213,7 @@ def oauth_login():
     oauth_for = (request.args.get("for") or "").strip().lower()
     popup = bool(request.args.get("popup"))
 
-    if _agent_demo_mode() and oauth_for not in ("site-picker", "queue-performance"):
+    if _agent_demo_mode() and oauth_for not in ("site-picker", "queue-performance", "hub"):
         return render_template(
             "agent_workspace/oauth_error.html",
             demo_mode=True,
@@ -225,8 +225,12 @@ def oauth_login():
         session["oauth_for"] = "site-picker"
     elif oauth_for in ("", "agent", "agent-workspace"):
         session["oauth_for"] = "agent"
+    elif oauth_for == "hub":
+        session["oauth_for"] = "hub"
+        next_url = (request.args.get("next") or session.get("oauth_next") or "/").strip()
+        session["oauth_next"] = next_url or "/"
     elif oauth_for == "queue-performance":
-        session["oauth_for"] = "queue-performance"
+        session["oauth_for"] = "hub"
         next_url = (
             request.args.get("next")
             or session.get("oauth_next")
@@ -260,11 +264,11 @@ def oauth_login():
 def oauth_callback():
     from flask import current_app
 
-    from app.ops_auth import allowed_role_names, sync_queue_performance_access
+    from app.ops_auth import sync_hub_access
     from core.cli import create_client, tool_log
 
     oauth_for = session.get("oauth_for")
-    if _agent_demo_mode() and oauth_for not in ("site-picker", "queue-performance"):
+    if _agent_demo_mode() and oauth_for not in ("site-picker", "queue-performance", "hub"):
         return redirect(url_for("agent.index"))
 
     popup = oauth_for == "site-picker"
@@ -322,37 +326,24 @@ def oauth_callback():
         user = fetch_current_user(tokens.access_token)
         persist_session(session, tokens=tokens, user=user)
 
-        if oauth_for == "queue-performance":
-            next_url = session.pop("oauth_next", "/queue-performance") or "/queue-performance"
+        if oauth_for in ("hub", "queue-performance"):
+            next_url = session.pop("oauth_next", "/") or "/"
             session.pop("oauth_for", None)
             try:
                 client = create_client(log=tool_log)
-                allowed, role_names, matched = sync_queue_performance_access(session, client)
+                sync_hub_access(session, client)
             except Exception as exc:
                 return (
                     render_template(
-                        "ops/queue_performance_denied.html",
-                        demo_mode=_ops_demo_mode(),
+                        "ops/hub_access_denied.html",
                         user_name=user.display_name,
                         user_roles=[],
-                        required_roles=sorted(allowed_role_names()),
+                        required_label="Genesys sign-in",
+                        required_roles=[],
                         matched_roles=[],
                         error_message=f"Could not verify Genesys roles: {exc}",
                     ),
                     502,
-                )
-            if not allowed:
-                return (
-                    render_template(
-                        "ops/queue_performance_denied.html",
-                        demo_mode=_ops_demo_mode(),
-                        user_name=user.display_name,
-                        user_roles=role_names,
-                        required_roles=sorted(allowed_role_names()),
-                        matched_roles=matched,
-                        error_message="",
-                    ),
-                    403,
                 )
             return redirect(next_url)
 

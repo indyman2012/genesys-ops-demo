@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
   <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='ops/hub.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/hub.css') }}?v=2">
 </head>
 <body class="hub-page ops-page{% if demo_mode %} demo-mode{% endif %}">
   <div class="app-shell">
@@ -40,6 +40,16 @@
     </div>
     <div class="topbar-right">
       <div class="topbar-actions">
+        {% if auth_enabled %}
+          {% if auth_signed_in %}
+          <span class="hub-auth-user">Signed in as {{ auth_user_name }}</span>
+          {% if auth_supervision %}<span class="hub-role-pill">Supervisor</span>{% endif %}
+          {% if auth_admin %}<span class="hub-role-pill">Admin</span>{% endif %}
+          <a href="{{ url_for('ops.hub_logout') }}" class="btn btn-secondary">Sign out</a>
+          {% else %}
+          <a href="{{ login_url }}" class="btn btn-primary">Sign in with Genesys</a>
+          {% endif %}
+        {% endif %}
         <button type="button" id="btn-health" class="btn btn-secondary">Check Auth</button>
       </div>
     </div>
@@ -48,8 +58,14 @@
   <main class="hub-main">
     <div class="hub-intro">
       <h1>Apps on this server</h1>
-      <p>Pick a tool below. Ops scripts, rosters, and reporting UIs all live here — use this page when you are not sure of the URL.</p>
+      <p>Frontline tools are open to everyone. Supervisor and admin sections appear after you sign in with the right Genesys role.</p>
     </div>
+
+    {% if signin_prompt %}
+    <div class="hub-signin-banner">
+      Sign in with Genesys on this page to open the app you selected{% if signin_next %} (<code>{{ signin_next }}</code>){% endif %}.
+    </div>
+    {% endif %}
 
     <div class="hub-search-wrap">
       <input type="search" id="hub-search" placeholder="Filter apps…" autocomplete="off" aria-label="Filter apps">
@@ -78,9 +94,24 @@
       </div>
     </section>
     {% endfor %}
+
+    {% if locked_sections %}
+    <div class="hub-locked-wrap">
+      <h2 class="hub-locked-heading">More apps after sign-in</h2>
+      {% for item in locked_sections %}
+      <div class="hub-locked-card">
+        <strong>{{ item.category }}</strong>
+        <p>{{ item.reason }}</p>
+        {% if auth_enabled and not auth_signed_in %}
+        <a class="btn btn-primary hub-locked-signin" href="{{ login_url }}">Sign in with Genesys</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </main>
   </div>
 
-  <script src="{{ url_for('static', filename='ops/hub.js') }}?v=1"></script>
+  <script src="{{ url_for('static', filename='ops/hub.js') }}?v=2"></script>
 </body>
 </html>
