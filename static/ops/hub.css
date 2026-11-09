@@ -1,0 +1,149 @@
+/* GenesysToolkit — app launcher (hub) */
+body.hub-page main.hub-main {
+  flex: 1 1 auto;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 2.5rem;
+}
+
+.hub-intro {
+  max-width: 42rem;
+  margin: 0 auto 1.5rem;
+  text-align: center;
+}
+
+.hub-intro h1 {
+  font-family: var(--font-heading);
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  color: var(--aw-heading);
+  margin: 0 0 0.35rem;
+}
+
+.hub-intro p {
+  margin: 0;
+  color: var(--aw-muted);
+  font-size: 0.92rem;
+}
+
+.hub-search-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 1.25rem 0 1.75rem;
+}
+
+#hub-search {
+  width: min(420px, 100%);
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--aw-border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+}
+
+#hub-search:focus {
+  outline: 2px solid var(--aw-blue-light);
+  border-color: var(--aw-blue);
+}
+
+.hub-section {
+  margin-bottom: 1.75rem;
+}
+
+.hub-section h2 {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  color: var(--aw-navy);
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid var(--aw-orange-light);
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+}
+
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.05rem;
+  background: var(--aw-white);
+  border: 1px solid var(--aw-border);
+  border-radius: 10px;
+  box-shadow: var(--aw-shadow);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+.hub-card:hover {
+  border-color: var(--aw-blue-light);
+  box-shadow: 0 10px 28px rgba(4, 54, 73, 0.12);
+  transform: translateY(-1px);
+}
+
+.hub-card:focus-visible {
+  outline: 2px solid var(--aw-blue);
+  outline-offset: 2px;
+}
+
+.hub-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.hub-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--aw-heading);
+  line-height: 1.25;
+}
+
+.hub-badge {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aw-orange);
+  background: var(--aw-orange-light);
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+}
+
+.hub-card p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--aw-muted);
+  line-height: 1.45;
+  flex: 1 1 auto;
+}
+
+.hub-card-cta {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--aw-blue);
+}
+
+.hub-empty {
+  text-align: center;
+  color: var(--aw-muted);
+  padding: 2rem 1rem;
+  display: none;
+}
+
+.hub-empty.visible {
+  display: block;
+}
+
+.hub-card.hidden-by-search {
+  display: none;
+}
+
+.hub-section.hidden-by-search {
+  display: none;
+}

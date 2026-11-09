@@ -1,0 +1,16 @@
+/* Shared “Back to Main” link for standalone mini-apps (no ArchWell topbar). */
+.back-main {
+  margin: 0 0 14px;
+}
+
+.back-main a {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #247a96;
+  text-decoration: none;
+}
+
+.back-main a:hover {
+  text-decoration: underline;
+}

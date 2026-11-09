@@ -40,7 +40,8 @@
     </div>
     <div class="topbar-right">
       <div class="topbar-actions">
-        <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Ops Console</a>
+        <a href="{{ url_for('ops.index') }}" class="btn btn-secondary">Back to Main</a>
+        <a href="{{ url_for('ops.ops_console') }}" class="btn btn-secondary">Ops Console</a>
         <a href="{{ url_for('ops.not_responding_page') }}" class="btn btn-secondary">Not Responding</a>
         <a href="{{ url_for('ops.queue_performance_page') }}" class="btn btn-secondary">Queue Performance</a>
         {% if auth_enabled and auth_user_name %}

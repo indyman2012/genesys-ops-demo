@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-demo-mode="{{ '1' if demo_mode else '0' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if demo_mode %}GenesysToolkit — Apps (Demo){% else %}GenesysToolkit — Apps{% endif %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='agent_workspace/archwell-favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="https://use.typekit.net/rne2uiy.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='archwell/shell.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ops/hub.css') }}?v=1">
+</head>
+<body class="hub-page ops-page{% if demo_mode %} demo-mode{% endif %}">
+  <div class="app-shell">
+  {% if demo_mode %}
+  <div class="demo-banner">
+    <strong>Demo mode</strong> — preview / dry-run deployments. Live changes require a production instance.
+  </div>
+  {% endif %}
+
+  <div class="topbar-strip">
+    <span>Contact Center · GenesysToolkit</span>
+  </div>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <p class="page-subtitle">One front door for web tools on this host.</p>
+    </div>
+    <div class="brand">
+      <img
+        class="brand-logo"
+        src="{{ url_for('static', filename='agent_workspace/archwell-logo.svg') }}"
+        alt="ArchWell Health"
+        width="160"
+        height="47"
+      >
+      <div class="brand-sub">GenesysToolkit{% if demo_mode %} <span class="demo-tag">Demo</span>{% endif %}</div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-actions">
+        <button type="button" id="btn-health" class="btn btn-secondary">Check Auth</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="hub-main">
+    <div class="hub-intro">
+      <h1>Apps on this server</h1>
+      <p>Pick a tool below. Ops scripts, rosters, and reporting UIs all live here — use this page when you are not sure of the URL.</p>
+    </div>
+
+    <div class="hub-search-wrap">
+      <input type="search" id="hub-search" placeholder="Filter apps…" autocomplete="off" aria-label="Filter apps">
+    </div>
+
+    <p class="hub-empty" id="hub-no-match">No apps match your filter.</p>
+
+    {% for section in sections %}
+    <section class="hub-section" data-category="{{ section.category }}">
+      <h2>{{ section.category }}</h2>
+      <div class="hub-grid">
+        {% for app in section.apps %}
+        <a
+          class="hub-card"
+          href="{{ app.href }}"
+          data-search="{{ app.title }} {{ app.description }} {{ section.category }}"
+        >
+          <div class="hub-card-head">
+            <h3>{{ app.title }}</h3>
+            {% if app.badge %}<span class="hub-badge">{{ app.badge }}</span>{% endif %}
+          </div>
+          <p>{{ app.description }}</p>
+          <span class="hub-card-cta">Open →</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='ops/hub.js') }}?v=1"></script>
+</body>
+</html>

@@ -32,6 +32,22 @@ def _demo_mode() -> bool:
 
 @ops_bp.route("/")
 def index():
+    """App launcher — single front door for web UIs on this host."""
+    from flask import current_app
+
+    from app.web_apps_catalog import hub_sections_for_app
+
+    demo = _demo_mode()
+    return render_template(
+        "ops/hub.html",
+        sections=hub_sections_for_app(current_app),
+        demo_mode=demo,
+    )
+
+
+@ops_bp.route("/ops")
+@ops_bp.route("/ops/")
+def ops_console():
     demo = _demo_mode()
     return render_template(
         "ops/index.html",

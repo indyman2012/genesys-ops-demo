@@ -131,6 +131,10 @@ body.agent-page .app-shell {
 .topbar-left {
   min-width: 0;
   justify-self: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
 }
 
 .brand {

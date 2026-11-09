@@ -25,7 +25,9 @@
   </div>
 
   <header class="topbar">
-    <div class="topbar-left" aria-hidden="true"></div>
+    <div class="topbar-left">
+      <a href="{{ url_for('ops.index') }}" class="role-nav-link back-link">← Back to Main</a>
+    </div>
     <div class="brand">
       <img
         class="brand-logo"
@@ -39,7 +41,7 @@
     <div class="topbar-right">
       <nav id="role-nav" class="role-nav{% if not demo_mode %} hidden{% endif %}">
         <a id="nav-supervisor" class="role-nav-link" href="{{ url_for('agent.reports') }}">Supervisor</a>
-        <a id="nav-admin" class="role-nav-link" href="/">Admin</a>
+        <a id="nav-admin" class="role-nav-link" href="{{ url_for('ops.index') }}">Main menu</a>
       </nav>
       <span id="agent-name" class="agent-name"></span>
       <span id="updated-at" class="muted small"></span>

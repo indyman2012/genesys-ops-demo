@@ -15,6 +15,7 @@
         <p>Sign in with your Genesys Cloud account. Access is limited to <strong>Supervisor</strong>, <strong>Admin</strong>, and <strong>Super Admin</strong> roles.</p>
         <div class="auth-actions">
           <a class="btn btn-primary" href="{{ url_for('agent.oauth_login', for='queue-performance') }}">Sign in with Genesys</a>
+          <a class="btn btn-secondary" href="{{ url_for('ops.index') }}">Back to Main</a>
         </div>
       </div>
     </section>
