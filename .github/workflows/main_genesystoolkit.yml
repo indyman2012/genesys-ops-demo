@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "**.md"
+      - "archive/**"
+      - "outputs/**"
+      - "logs/**"
+      - "scripts/probes/**"
   workflow_dispatch:
 
 jobs:
@@ -22,45 +28,37 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Verify application files
+      - name: Stage curated web app bundle (hub launcher)
+        run: python scripts/stage_azure_webapp.py --output-dir azure-bundle
+
+      - name: Verify bundle layout
         run: |
-          echo "Repository root:"
-          pwd
+          test -f azure-bundle/genesys_toolkit_app.py
+          test -f azure-bundle/startup.sh
+          test -f azure-bundle/requirements.txt
+          test -f azure-bundle/app/web_apps_catalog.py
+          test -f azure-bundle/templates/ops/hub.html
+          test -f azure-bundle/static/ops/hub.css
+          chmod +x azure-bundle/startup.sh
+          echo "Bundle file count:"
+          find azure-bundle -type f | wc -l
 
-          echo "Root contents:"
-          ls -la
-
-          echo "Looking for GenesysToolkit entry point:"
-          find . -maxdepth 4 -name "genesys_toolkit_app.py" -print
-
-          echo "Verifying entry point exists at repository root:"
-          test -f ./genesys_toolkit_app.py
-
-          echo "Verifying requirements.txt exists:"
-          test -f ./requirements.txt
-
-      - name: Create virtual environment and validate dependencies
+      - name: Validate dependencies and import
+        working-directory: azure-bundle
         run: |
           python -m venv antenv
           source antenv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Validate Python application import
-        run: |
-          source antenv/bin/activate
-          python -c "from genesys_toolkit_app import app; print('genesys_toolkit_app imported successfully')"
+          python -c "from genesys_toolkit_app import app; print('genesys_toolkit_app imported OK')"
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            .
-            !antenv/
-            !.git/
+          path: azure-bundle/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 3
 
   deploy:
     runs-on: ubuntu-latest
@@ -79,20 +77,12 @@ jobs:
 
       - name: Verify deployment artifact
         run: |
-          echo "Deployment directory:"
-          pwd
-
-          echo "Deployment contents:"
-          ls -la
-
-          echo "Locating GenesysToolkit entry point:"
-          find . -maxdepth 4 -name "genesys_toolkit_app.py" -print
-
-          echo "Verifying entry point is at deployment root:"
           test -f ./genesys_toolkit_app.py
-
-          echo "Verifying requirements.txt:"
+          test -f ./startup.sh
           test -f ./requirements.txt
+          test -f ./templates/ops/hub.html
+          chmod +x ./startup.sh
+          find . -maxdepth 3 -type f | head -30
 
       - name: Login to Azure
         uses: azure/login@v2

@@ -8,6 +8,9 @@ gmail_token.json
 
 # Tool output and runtime artifacts
 outputs/
+azure-bundle/
+render.env
+config/*.env
 uploads/
 payloads/
 logs/
